@@ -6,7 +6,8 @@
 
 1. `RESEARCH-SUMMARY.md` - What was validated and which sources were used (S/A tiers first)
 2. `multi-platform-HARD-RULES.md` - Cross-tool filename and precedence constraints (S/A tiers)
-3. Pick a standard:
+3. `multi-platform-OPINIONS.md` - Cross-tool best practices and recommendations
+4. Pick a standard:
    - `claude-code-HARD-RULES.md` / `claude-code-OPINIONS.md`
    - `agent-skills-HARD-RULES.md` / `agent-skills-OPINIONS.md`
    - `mcp-HARD-RULES.md` / `mcp-OPINIONS.md`
@@ -44,4 +45,3 @@ When documenting cross-platform behavior, list and validate tools in this order:
 - OpenCode: `AGENTS.md` (+ `AGENTS.local.md`, global `~/.config/opencode/AGENTS.md`, `Claude.md` fallback)
 - Cursor: `.cursor/rules/*.mdc` (preferred), `.cursorrules` (legacy), plus `AGENTS.md`/`CLAUDE.md` supported at root
 - Cline: `.clinerules` or `.clinerules/`, plus `AGENTS.md`
-
