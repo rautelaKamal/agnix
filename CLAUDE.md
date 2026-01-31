@@ -49,6 +49,46 @@ Format: `[CATEGORY]-[NUMBER]` (AS-004, CC-HK-001, etc.)
 - 76 passing tests
 - See GitHub issues for remaining tasks
 
+## Top tier tools support:
+
+### S (test always)
+
+- Claude code
+- codex cli
+- opencode
+
+### A (test on major changes)
+
+- GitHub copilot
+- Cline
+- Cursor
+
+### B (test on significant changes if time permits)
+
+- Roo Code
+- Kiro cli
+- amp
+- pi
+
+### C (Community reports fixes only)
+
+- gemini cli
+- continue
+- Antigravity
+
+## D (No support, nice to have, can try once in a while, mainly if users request)
+
+- Tabnine
+- Codeium
+- Amazon Q
+- Windsurf
+- Aider
+- SourceGraph Cody
+
+## E (No support, do not test, full community support and contributions)
+
+- Everything else
+
 ## References
 
 - SPEC.md - Technical reference
