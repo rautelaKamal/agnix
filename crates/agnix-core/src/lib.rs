@@ -16,7 +16,9 @@ pub mod parsers;
 pub mod rules;
 pub mod schemas;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use rayon::prelude::*;
 
 pub use config::LintConfig;
 pub use diagnostics::{Diagnostic, DiagnosticLevel, LintError, LintResult};
@@ -126,54 +128,57 @@ pub fn validate_file(path: &Path, config: &LintConfig) -> LintResult<Vec<Diagnos
 pub fn validate_project(path: &Path, config: &LintConfig) -> LintResult<Vec<Diagnostic>> {
     use ignore::WalkBuilder;
 
-    let mut diagnostics = Vec::new();
-
     // Pre-compile exclude patterns once (avoids N+1 pattern compilation)
+    // Panic on invalid patterns to catch config errors early
     let exclude_patterns: Vec<glob::Pattern> = config
         .exclude
         .iter()
-        .filter_map(|p| glob::Pattern::new(p).ok())
+        .map(|p| {
+            glob::Pattern::new(p)
+                .unwrap_or_else(|_| panic!("Invalid exclude pattern in config: {}", p))
+        })
         .collect();
 
-    let walker = WalkBuilder::new(path)
+    // Collect all file paths to validate (sequential walk, parallel validation)
+    let paths: Vec<PathBuf> = WalkBuilder::new(path)
         .standard_filters(true)
-        .build();
+        .build()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path().is_file())
+        .filter(|entry| {
+            let path_str = entry.path().to_string_lossy();
+            !exclude_patterns.iter().any(|p| p.matches(&path_str))
+        })
+        .map(|entry| entry.path().to_path_buf())
+        .collect();
 
-    for entry in walker {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-
-        let file_path = entry.path();
-
-        if !file_path.is_file() {
-            continue;
-        }
-
-        let path_str = file_path.to_string_lossy();
-        let should_exclude = exclude_patterns.iter().any(|p| p.matches(&path_str));
-
-        if should_exclude {
-            continue;
-        }
-
-        match validate_file(file_path, config) {
-            Ok(file_diagnostics) => diagnostics.extend(file_diagnostics),
-            Err(e) => {
-                diagnostics.push(Diagnostic::error(
-                    file_path.to_path_buf(),
-                    0,
-                    0,
-                    "file::read",
-                    format!("Failed to validate file: {}", e),
-                ));
+    // Validate files in parallel
+    let mut diagnostics: Vec<Diagnostic> = paths
+        .par_iter()
+        .flat_map(|file_path| {
+            match validate_file(file_path, config) {
+                Ok(file_diagnostics) => file_diagnostics,
+                Err(e) => {
+                    vec![Diagnostic::error(
+                        file_path.clone(),
+                        0,
+                        0,
+                        "file::read",
+                        format!("Failed to validate file: {}", e),
+                    )]
+                }
             }
-        }
-    }
+        })
+        .collect();
 
-    // Sort by severity (errors first), then by file path
-    diagnostics.sort_by(|a, b| a.level.cmp(&b.level).then_with(|| a.file.cmp(&b.file)));
+    // Sort by severity (errors first), then by file path, then by line/rule for full determinism
+    diagnostics.sort_by(|a, b| {
+        a.level
+            .cmp(&b.level)
+            .then_with(|| a.file.cmp(&b.file))
+            .then_with(|| a.line.cmp(&b.line))
+            .then_with(|| a.rule.cmp(&b.rule))
+    });
 
     Ok(diagnostics)
 }
@@ -415,5 +420,134 @@ mod tests {
             .filter(|d| d.level == DiagnosticLevel::Error)
             .collect();
         assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_parallel_validation_deterministic_output() {
+        // Create a project structure with multiple files that will generate diagnostics
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Create multiple skill files with issues to ensure non-trivial parallel work
+        for i in 0..5 {
+            let skill_dir = temp.path().join(format!("skill-{}", i));
+            std::fs::create_dir_all(&skill_dir).unwrap();
+            std::fs::write(
+                skill_dir.join("SKILL.md"),
+                format!(
+                    "---\nname: deploy-prod-{}\ndescription: Deploys things\n---\nBody",
+                    i
+                ),
+            )
+            .unwrap();
+        }
+
+        // Create some CLAUDE.md files too
+        for i in 0..3 {
+            let dir = temp.path().join(format!("project-{}", i));
+            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::write(
+                dir.join("CLAUDE.md"),
+                "# Project\n\nBe helpful and concise.\n",
+            )
+            .unwrap();
+        }
+
+        let config = LintConfig::default();
+
+        // Run validation multiple times and verify identical output
+        let first_result = validate_project(temp.path(), &config).unwrap();
+
+        for run in 1..=10 {
+            let result = validate_project(temp.path(), &config).unwrap();
+
+            assert_eq!(
+                first_result.len(),
+                result.len(),
+                "Run {} produced different number of diagnostics",
+                run
+            );
+
+            for (i, (a, b)) in first_result.iter().zip(result.iter()).enumerate() {
+                assert_eq!(
+                    a.file, b.file,
+                    "Run {} diagnostic {} has different file",
+                    run, i
+                );
+                assert_eq!(
+                    a.rule, b.rule,
+                    "Run {} diagnostic {} has different rule",
+                    run, i
+                );
+                assert_eq!(
+                    a.level, b.level,
+                    "Run {} diagnostic {} has different level",
+                    run, i
+                );
+            }
+        }
+
+        // Verify we actually got some diagnostics (the dangerous name rule should fire)
+        assert!(
+            !first_result.is_empty(),
+            "Expected diagnostics for deploy-prod-* skill names"
+        );
+    }
+
+    #[test]
+    fn test_parallel_validation_single_file() {
+        // Edge case: verify parallel code works correctly with just one file
+        let temp = tempfile::TempDir::new().unwrap();
+        std::fs::write(
+            temp.path().join("SKILL.md"),
+            "---\nname: deploy-prod\ndescription: Deploys\n---\nBody",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let diagnostics = validate_project(temp.path(), &config).unwrap();
+
+        // Should have at least one diagnostic for the dangerous name (CC-SK-006)
+        assert!(
+            diagnostics.iter().any(|d| d.rule == "CC-SK-006"),
+            "Expected CC-SK-006 diagnostic for dangerous deploy-prod name"
+        );
+    }
+
+    #[test]
+    fn test_parallel_validation_mixed_results() {
+        // Test mix of valid and invalid files processed in parallel
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Valid skill (no diagnostics expected)
+        let valid_dir = temp.path().join("valid");
+        std::fs::create_dir_all(&valid_dir).unwrap();
+        std::fs::write(
+            valid_dir.join("SKILL.md"),
+            "---\nname: code-review\ndescription: Use when reviewing code\n---\nBody",
+        )
+        .unwrap();
+
+        // Invalid skill (diagnostics expected)
+        let invalid_dir = temp.path().join("invalid");
+        std::fs::create_dir_all(&invalid_dir).unwrap();
+        std::fs::write(
+            invalid_dir.join("SKILL.md"),
+            "---\nname: deploy-prod\ndescription: Deploys\n---\nBody",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let diagnostics = validate_project(temp.path(), &config).unwrap();
+
+        // Should have diagnostics only from the invalid skill
+        let error_diagnostics: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.level == DiagnosticLevel::Error)
+            .collect();
+
+        assert!(
+            error_diagnostics.iter().all(|d| d.file.to_string_lossy().contains("invalid")),
+            "Errors should only come from the invalid skill"
+        );
     }
 }
