@@ -1,0 +1,24 @@
+severity = "Warning"
+target = "Generic"
+exclude = [
+  "node_modules/**",
+  ".git/**",
+  "target/**",
+  "tests/fixtures/**",
+]
+
+[rules]
+skills = true
+hooks = true
+agents = true
+memory = true
+plugins = true
+xml = true
+imports = true
+generic_instructions = true
+frontmatter_validation = true
+xml_balance = true
+import_references = true
+tool_names = true
+required_fields = true
+disabled_rules = []

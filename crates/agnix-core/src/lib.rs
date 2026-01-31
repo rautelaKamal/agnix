@@ -135,7 +135,8 @@ pub fn validate_project(path: &Path, config: &LintConfig) -> LintResult<Vec<Diag
         .exclude
         .iter()
         .map(|p| {
-            glob::Pattern::new(p)
+            let normalized = p.replace('\\', "/");
+            glob::Pattern::new(&normalized)
                 .unwrap_or_else(|_| panic!("Invalid exclude pattern in config: {}", p))
         })
         .collect();
@@ -147,7 +148,10 @@ pub fn validate_project(path: &Path, config: &LintConfig) -> LintResult<Vec<Diag
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path().is_file())
         .filter(|entry| {
-            let path_str = entry.path().to_string_lossy();
+            let mut path_str = entry.path().to_string_lossy().replace('\\', "/");
+            if let Some(stripped) = path_str.strip_prefix("./") {
+                path_str = stripped.to_string();
+            }
             !exclude_patterns.iter().any(|p| p.matches(&path_str))
         })
         .map(|entry| entry.path().to_path_buf())

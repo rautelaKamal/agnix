@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use colored::*;
 use similar::{ChangeTag, TextDiff};
 use std::path::PathBuf;
+use std::env;
 use std::process;
 
 #[derive(Parser)]
@@ -89,7 +90,8 @@ fn main() {
 }
 
 fn validate_command(path: &PathBuf, cli: &Cli) -> anyhow::Result<()> {
-    let mut config = LintConfig::load_or_default(cli.config.as_ref());
+    let config_path = resolve_config_path(path, cli);
+    let mut config = LintConfig::load_or_default(config_path.as_ref());
     config.target = match cli.target.as_str() {
         "claude-code" => TargetTool::ClaudeCode,
         "cursor" => TargetTool::Cursor,
@@ -234,6 +236,32 @@ fn validate_command(path: &PathBuf, cli: &Cli) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_config_path(path: &PathBuf, cli: &Cli) -> Option<PathBuf> {
+    if let Some(config) = &cli.config {
+        return Some(config.clone());
+    }
+
+    let mut candidates = Vec::new();
+    if path.is_dir() {
+        candidates.push(path.clone());
+    } else if let Some(parent) = path.parent() {
+        candidates.push(parent.to_path_buf());
+    }
+
+    if let Ok(cwd) = env::current_dir() {
+        candidates.push(cwd);
+    }
+
+    for dir in candidates {
+        let candidate = dir.join(".agnix.toml");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+    }
+
+    None
 }
 
 fn show_diff(original: &str, fixed: &str) {

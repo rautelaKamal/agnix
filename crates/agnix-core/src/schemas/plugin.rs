@@ -1,7 +1,6 @@
 //! Plugin manifest schema
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// plugin.json schema
 #[derive(Debug, Clone, Serialize, Deserialize)]
