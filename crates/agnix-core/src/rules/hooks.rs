@@ -20,28 +20,58 @@ struct DangerousPattern {
 
 static DANGEROUS_PATTERNS: Lazy<Vec<DangerousPattern>> = Lazy::new(|| {
     let patterns: &[(&str, &str)] = &[
-        (r"rm\s+-rf\s+/", "Recursive delete from root is extremely dangerous"),
-        (r"rm\s+-rf\s+\*", "Recursive delete with wildcard could delete unintended files"),
-        (r"rm\s+-rf\s+\.\.", "Recursive delete of parent directories is dangerous"),
-        (r"git\s+reset\s+--hard", "Hard reset discards uncommitted changes permanently"),
-        (r"git\s+clean\s+-fd", "Git clean -fd removes untracked files permanently"),
-        (r"git\s+push\s+.*--force", "Force push can overwrite remote history"),
+        (
+            r"rm\s+-rf\s+/",
+            "Recursive delete from root is extremely dangerous",
+        ),
+        (
+            r"rm\s+-rf\s+\*",
+            "Recursive delete with wildcard could delete unintended files",
+        ),
+        (
+            r"rm\s+-rf\s+\.\.",
+            "Recursive delete of parent directories is dangerous",
+        ),
+        (
+            r"git\s+reset\s+--hard",
+            "Hard reset discards uncommitted changes permanently",
+        ),
+        (
+            r"git\s+clean\s+-fd",
+            "Git clean -fd removes untracked files permanently",
+        ),
+        (
+            r"git\s+push\s+.*--force",
+            "Force push can overwrite remote history",
+        ),
         (r"drop\s+database", "Dropping database is irreversible"),
         (r"drop\s+table", "Dropping table is irreversible"),
         (r"truncate\s+table", "Truncating table deletes all data"),
-        (r"curl\s+.*\|\s*sh", "Piping curl to shell is a security risk"),
-        (r"curl\s+.*\|\s*bash", "Piping curl to bash is a security risk"),
-        (r"wget\s+.*\|\s*sh", "Piping wget to shell is a security risk"),
+        (
+            r"curl\s+.*\|\s*sh",
+            "Piping curl to shell is a security risk",
+        ),
+        (
+            r"curl\s+.*\|\s*bash",
+            "Piping curl to bash is a security risk",
+        ),
+        (
+            r"wget\s+.*\|\s*sh",
+            "Piping wget to shell is a security risk",
+        ),
         (r"chmod\s+777", "chmod 777 gives everyone full access"),
-        (r">\s*/dev/sd[a-z]", "Writing directly to block devices can destroy data"),
+        (
+            r">\s*/dev/sd[a-z]",
+            "Writing directly to block devices can destroy data",
+        ),
         (r"mkfs\.", "Formatting filesystem destroys all data"),
         (r"dd\s+if=.*of=/dev/", "dd to device can destroy data"),
     ];
     patterns
         .iter()
         .map(|&(pattern, reason)| {
-            let regex = Regex::new(&format!("(?i){}", pattern))
-                .expect("Invalid dangerous pattern regex");
+            let regex =
+                Regex::new(&format!("(?i){}", pattern)).expect("Invalid dangerous pattern regex");
             DangerousPattern {
                 regex,
                 pattern,
@@ -141,8 +171,7 @@ impl Validator for HooksValidator {
                 for (event, matchers) in hooks_obj {
                     if let Some(matchers_arr) = matchers.as_array() {
                         for (matcher_idx, matcher) in matchers_arr.iter().enumerate() {
-                            if let Some(hooks_arr) =
-                                matcher.get("hooks").and_then(|h| h.as_array())
+                            if let Some(hooks_arr) = matcher.get("hooks").and_then(|h| h.as_array())
                             {
                                 for (hook_idx, hook) in hooks_arr.iter().enumerate() {
                                     if hook.get("type").is_none() {
@@ -232,46 +261,47 @@ impl Validator for HooksValidator {
 
             for (matcher_idx, matcher) in matchers.iter().enumerate() {
                 // CC-HK-003: Missing matcher for tool events
-                if config.is_rule_enabled("CC-HK-003") {
-                    if HooksSchema::is_tool_event(event) && matcher.matcher.is_none() {
-                        let hook_location = format!("hooks.{}[{}]", event, matcher_idx);
-                        diagnostics.push(
-                            Diagnostic::error(
-                                path.to_path_buf(),
-                                1,
-                                0,
-                                "CC-HK-003",
-                                format!(
-                                    "Tool event '{}' at {} requires a matcher field",
-                                    event, hook_location
-                                ),
-                            )
-                            .with_suggestion(
-                                "Add 'matcher': '*' for all tools or specify a tool name"
-                                    .to_string(),
+                if config.is_rule_enabled("CC-HK-003")
+                    && HooksSchema::is_tool_event(event)
+                    && matcher.matcher.is_none()
+                {
+                    let hook_location = format!("hooks.{}[{}]", event, matcher_idx);
+                    diagnostics.push(
+                        Diagnostic::error(
+                            path.to_path_buf(),
+                            1,
+                            0,
+                            "CC-HK-003",
+                            format!(
+                                "Tool event '{}' at {} requires a matcher field",
+                                event, hook_location
                             ),
-                        );
-                    }
+                        )
+                        .with_suggestion(
+                            "Add 'matcher': '*' for all tools or specify a tool name".to_string(),
+                        ),
+                    );
                 }
 
                 // CC-HK-004: Matcher on non-tool event
-                if config.is_rule_enabled("CC-HK-004") {
-                    if !HooksSchema::is_tool_event(event) && matcher.matcher.is_some() {
-                        let hook_location = format!("hooks.{}[{}]", event, matcher_idx);
-                        diagnostics.push(
-                            Diagnostic::error(
-                                path.to_path_buf(),
-                                1,
-                                0,
-                                "CC-HK-004",
-                                format!(
-                                    "Non-tool event '{}' at {} must not have a matcher field",
-                                    event, hook_location
-                                ),
-                            )
-                            .with_suggestion("Remove the 'matcher' field".to_string()),
-                        );
-                    }
+                if config.is_rule_enabled("CC-HK-004")
+                    && !HooksSchema::is_tool_event(event)
+                    && matcher.matcher.is_some()
+                {
+                    let hook_location = format!("hooks.{}[{}]", event, matcher_idx);
+                    diagnostics.push(
+                        Diagnostic::error(
+                            path.to_path_buf(),
+                            1,
+                            0,
+                            "CC-HK-004",
+                            format!(
+                                "Non-tool event '{}' at {} must not have a matcher field",
+                                event, hook_location
+                            ),
+                        )
+                        .with_suggestion("Remove the 'matcher' field".to_string()),
+                    );
                 }
 
                 for (hook_idx, hook) in matcher.hooks.iter().enumerate() {
@@ -289,9 +319,8 @@ impl Validator for HooksValidator {
                     match hook {
                         Hook::Command { command, .. } => {
                             // CC-HK-006: Missing command field
-                            if config.is_rule_enabled("CC-HK-006") {
-                                if command.is_none() {
-                                    diagnostics.push(
+                            if config.is_rule_enabled("CC-HK-006") && command.is_none() {
+                                diagnostics.push(
                                         Diagnostic::error(
                                             path.to_path_buf(),
                                             1,
@@ -307,7 +336,6 @@ impl Validator for HooksValidator {
                                                 .to_string(),
                                         ),
                                     );
-                                }
                             }
 
                             if let Some(cmd) = command {
@@ -315,8 +343,8 @@ impl Validator for HooksValidator {
                                 if config.is_rule_enabled("CC-HK-008") {
                                     for script_path in self.extract_script_paths(cmd) {
                                         if !self.has_unresolved_env_vars(&script_path) {
-                                            let resolved = self
-                                                .resolve_script_path(&script_path, project_dir);
+                                            let resolved =
+                                                self.resolve_script_path(&script_path, project_dir);
                                             if !resolved.exists() {
                                                 diagnostics.push(
                                                     Diagnostic::error(
@@ -367,9 +395,10 @@ impl Validator for HooksValidator {
                         }
                         Hook::Prompt { prompt, .. } => {
                             // CC-HK-002: Prompt on wrong event
-                            if config.is_rule_enabled("CC-HK-002") {
-                                if !HooksSchema::is_prompt_event(event) {
-                                    diagnostics.push(
+                            if config.is_rule_enabled("CC-HK-002")
+                                && !HooksSchema::is_prompt_event(event)
+                            {
+                                diagnostics.push(
                                         Diagnostic::error(
                                             path.to_path_buf(),
                                             1,
@@ -384,28 +413,25 @@ impl Validator for HooksValidator {
                                             "Use 'type': 'command' instead, or move this hook to Stop/SubagentStop".to_string(),
                                         ),
                                     );
-                                }
                             }
 
                             // CC-HK-007: Missing prompt field
-                            if config.is_rule_enabled("CC-HK-007") {
-                                if prompt.is_none() {
-                                    diagnostics.push(
-                                        Diagnostic::error(
-                                            path.to_path_buf(),
-                                            1,
-                                            0,
-                                            "CC-HK-007",
-                                            format!(
-                                                "Prompt hook at {} is missing required 'prompt' field",
-                                                hook_location
-                                            ),
-                                        )
-                                        .with_suggestion(
-                                            "Add a 'prompt' field with the prompt text".to_string(),
+                            if config.is_rule_enabled("CC-HK-007") && prompt.is_none() {
+                                diagnostics.push(
+                                    Diagnostic::error(
+                                        path.to_path_buf(),
+                                        1,
+                                        0,
+                                        "CC-HK-007",
+                                        format!(
+                                            "Prompt hook at {} is missing required 'prompt' field",
+                                            hook_location
                                         ),
-                                    );
-                                }
+                                    )
+                                    .with_suggestion(
+                                        "Add a 'prompt' field with the prompt text".to_string(),
+                                    ),
+                                );
                             }
                         }
                     }
@@ -435,10 +461,7 @@ fn find_closest_event(invalid_event: &str) -> String {
         }
     }
 
-    format!(
-        "Valid events are: {}",
-        HooksSchema::VALID_EVENTS.join(", ")
-    )
+    format!("Valid events are: {}", HooksSchema::VALID_EVENTS.join(", "))
 }
 
 #[cfg(test)]
@@ -449,11 +472,7 @@ mod tests {
 
     fn validate(content: &str) -> Vec<Diagnostic> {
         let validator = HooksValidator;
-        validator.validate(
-            Path::new("settings.json"),
-            content,
-            &LintConfig::default(),
-        )
+        validator.validate(Path::new("settings.json"), content, &LintConfig::default())
     }
 
     #[test]
@@ -472,11 +491,16 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-006").collect();
+        let cc_hk_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-006")
+            .collect();
 
         assert_eq!(cc_hk_006.len(), 1);
         assert_eq!(cc_hk_006[0].level, DiagnosticLevel::Error);
-        assert!(cc_hk_006[0].message.contains("missing required 'command' field"));
+        assert!(cc_hk_006[0]
+            .message
+            .contains("missing required 'command' field"));
     }
 
     #[test]
@@ -495,7 +519,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-006").collect();
+        let cc_hk_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-006")
+            .collect();
 
         assert_eq!(cc_hk_006.len(), 0);
     }
@@ -518,7 +545,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-006").collect();
+        let cc_hk_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-006")
+            .collect();
 
         assert_eq!(cc_hk_006.len(), 2);
     }
@@ -538,11 +568,16 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_007: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-007").collect();
+        let cc_hk_007: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-007")
+            .collect();
 
         assert_eq!(cc_hk_007.len(), 1);
         assert_eq!(cc_hk_007[0].level, DiagnosticLevel::Error);
-        assert!(cc_hk_007[0].message.contains("missing required 'prompt' field"));
+        assert!(cc_hk_007[0]
+            .message
+            .contains("missing required 'prompt' field"));
     }
 
     #[test]
@@ -560,7 +595,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_007: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-007").collect();
+        let cc_hk_007: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-007")
+            .collect();
 
         assert_eq!(cc_hk_007.len(), 0);
     }
@@ -581,7 +619,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_007: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-007").collect();
+        let cc_hk_007: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-007")
+            .collect();
 
         assert_eq!(cc_hk_007.len(), 1);
     }
@@ -601,7 +642,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_008: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-008").collect();
+        let cc_hk_008: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-008")
+            .collect();
 
         assert_eq!(cc_hk_008.len(), 1);
         assert_eq!(cc_hk_008[0].level, DiagnosticLevel::Error);
@@ -624,7 +668,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_008: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-008").collect();
+        let cc_hk_008: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-008")
+            .collect();
 
         assert_eq!(cc_hk_008.len(), 0);
     }
@@ -644,7 +691,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_008: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-008").collect();
+        let cc_hk_008: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-008")
+            .collect();
 
         assert_eq!(cc_hk_008.len(), 0);
     }
@@ -665,7 +715,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_008: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-008").collect();
+        let cc_hk_008: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-008")
+            .collect();
 
         assert_eq!(cc_hk_008.len(), 1);
         assert!(cc_hk_008[0].message.contains("logger.py"));
@@ -686,7 +739,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_008: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-008").collect();
+        let cc_hk_008: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-008")
+            .collect();
 
         assert_eq!(cc_hk_008.len(), 0);
     }
@@ -706,7 +762,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert_eq!(cc_hk_009[0].level, DiagnosticLevel::Warning);
@@ -729,7 +788,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert!(cc_hk_009[0].message.contains("Hard reset"));
@@ -750,7 +812,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert!(cc_hk_009[0].message.contains("security risk"));
@@ -772,7 +837,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert!(cc_hk_009[0].message.contains("Force push"));
@@ -793,7 +861,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert!(cc_hk_009[0].message.contains("irreversible"));
@@ -814,7 +885,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 1);
         assert!(cc_hk_009[0].message.contains("full access"));
@@ -838,7 +912,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
 
         assert_eq!(cc_hk_009.len(), 0);
     }
@@ -869,7 +946,11 @@ mod tests {
 
         let rule_errors: Vec<_> = diagnostics
             .iter()
-            .filter(|d| d.rule.starts_with("CC-HK-006") || d.rule.starts_with("CC-HK-007") || d.rule.starts_with("CC-HK-009"))
+            .filter(|d| {
+                d.rule.starts_with("CC-HK-006")
+                    || d.rule.starts_with("CC-HK-007")
+                    || d.rule.starts_with("CC-HK-009")
+            })
             .collect();
 
         assert_eq!(rule_errors.len(), 0);
@@ -902,7 +983,10 @@ mod tests {
 
         let diagnostics = validate(content);
 
-        let parse_errors: Vec<_> = diagnostics.iter().filter(|d| d.rule == "hooks::parse").collect();
+        let parse_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "hooks::parse")
+            .collect();
         assert_eq!(parse_errors.len(), 0);
     }
 
@@ -912,7 +996,10 @@ mod tests {
 
         let diagnostics = validate(content);
 
-        let parse_errors: Vec<_> = diagnostics.iter().filter(|d| d.rule == "hooks::parse").collect();
+        let parse_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "hooks::parse")
+            .collect();
         assert_eq!(parse_errors.len(), 1);
     }
 
@@ -974,8 +1061,12 @@ mod tests {
         let validator = HooksValidator;
 
         assert!(validator.check_dangerous_patterns("RM -RF /").is_some());
-        assert!(validator.check_dangerous_patterns("Git Reset --Hard").is_some());
-        assert!(validator.check_dangerous_patterns("DROP DATABASE test").is_some());
+        assert!(validator
+            .check_dangerous_patterns("Git Reset --Hard")
+            .is_some());
+        assert!(validator
+            .check_dangerous_patterns("DROP DATABASE test")
+            .is_some());
     }
 
     #[test]
@@ -993,7 +1084,10 @@ mod tests {
     fn test_fixture_missing_command() {
         let content = include_str!("../../../../tests/fixtures/hooks/missing-command-field.json");
         let diagnostics = validate(content);
-        let cc_hk_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-006").collect();
+        let cc_hk_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-006")
+            .collect();
         assert!(!cc_hk_006.is_empty());
     }
 
@@ -1001,7 +1095,10 @@ mod tests {
     fn test_fixture_missing_prompt() {
         let content = include_str!("../../../../tests/fixtures/hooks/missing-prompt-field.json");
         let diagnostics = validate(content);
-        let cc_hk_007: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-007").collect();
+        let cc_hk_007: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-007")
+            .collect();
         assert!(!cc_hk_007.is_empty());
     }
 
@@ -1009,7 +1106,10 @@ mod tests {
     fn test_fixture_dangerous_commands() {
         let content = include_str!("../../../../tests/fixtures/hooks/dangerous-commands.json");
         let diagnostics = validate(content);
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
         assert!(cc_hk_009.len() >= 3);
     }
 
@@ -1030,7 +1130,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
 
         assert_eq!(cc_hk_001.len(), 1);
         assert_eq!(cc_hk_001[0].level, DiagnosticLevel::Error);
@@ -1054,12 +1157,23 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
 
         assert_eq!(cc_hk_001.len(), 1);
         // Should suggest the correct case
-        assert!(cc_hk_001[0].suggestion.as_ref().unwrap().contains("PreToolUse"));
-        assert!(cc_hk_001[0].suggestion.as_ref().unwrap().contains("case-sensitive"));
+        assert!(cc_hk_001[0]
+            .suggestion
+            .as_ref()
+            .unwrap()
+            .contains("PreToolUse"));
+        assert!(cc_hk_001[0]
+            .suggestion
+            .as_ref()
+            .unwrap()
+            .contains("case-sensitive"));
     }
 
     #[test]
@@ -1078,7 +1192,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
 
         assert_eq!(cc_hk_001.len(), 0);
     }
@@ -1105,7 +1222,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
 
         assert_eq!(cc_hk_001.len(), 2);
     }
@@ -1114,7 +1234,10 @@ mod tests {
     fn test_fixture_invalid_event() {
         let content = include_str!("../../../../tests/fixtures/hooks/invalid-event.json");
         let diagnostics = validate(content);
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
         // "InvalidEvent" and "pretooluse" are invalid
         assert_eq!(cc_hk_001.len(), 2);
     }
@@ -1137,11 +1260,16 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-002").collect();
+        let cc_hk_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-002")
+            .collect();
 
         assert_eq!(cc_hk_002.len(), 1);
         assert_eq!(cc_hk_002[0].level, DiagnosticLevel::Error);
-        assert!(cc_hk_002[0].message.contains("only allowed for Stop and SubagentStop"));
+        assert!(cc_hk_002[0]
+            .message
+            .contains("only allowed for Stop and SubagentStop"));
     }
 
     #[test]
@@ -1159,7 +1287,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-002").collect();
+        let cc_hk_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-002")
+            .collect();
 
         assert_eq!(cc_hk_002.len(), 1);
     }
@@ -1179,7 +1310,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-002").collect();
+        let cc_hk_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-002")
+            .collect();
 
         assert_eq!(cc_hk_002.len(), 0);
     }
@@ -1199,7 +1333,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-002").collect();
+        let cc_hk_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-002")
+            .collect();
 
         assert_eq!(cc_hk_002.len(), 0);
     }
@@ -1208,7 +1345,10 @@ mod tests {
     fn test_fixture_prompt_on_wrong_event() {
         let content = include_str!("../../../../tests/fixtures/hooks/prompt-on-wrong-event.json");
         let diagnostics = validate(content);
-        let cc_hk_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-002").collect();
+        let cc_hk_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-002")
+            .collect();
         // PreToolUse and SessionStart should trigger errors, Stop and SubagentStop should not
         assert_eq!(cc_hk_002.len(), 2);
     }
@@ -1230,7 +1370,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-003").collect();
+        let cc_hk_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-003")
+            .collect();
 
         assert_eq!(cc_hk_003.len(), 1);
         assert_eq!(cc_hk_003[0].level, DiagnosticLevel::Error);
@@ -1252,7 +1395,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-003").collect();
+        let cc_hk_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-003")
+            .collect();
 
         assert_eq!(cc_hk_003.len(), 1);
     }
@@ -1272,7 +1418,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-003").collect();
+        let cc_hk_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-003")
+            .collect();
 
         assert_eq!(cc_hk_003.len(), 1);
     }
@@ -1293,7 +1442,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-003").collect();
+        let cc_hk_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-003")
+            .collect();
 
         assert_eq!(cc_hk_003.len(), 0);
     }
@@ -1302,7 +1454,10 @@ mod tests {
     fn test_fixture_missing_matcher() {
         let content = include_str!("../../../../tests/fixtures/hooks/missing-matcher.json");
         let diagnostics = validate(content);
-        let cc_hk_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-003").collect();
+        let cc_hk_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-003")
+            .collect();
         // All 4 tool events without matchers
         assert_eq!(cc_hk_003.len(), 4);
     }
@@ -1325,7 +1480,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-004").collect();
+        let cc_hk_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-004")
+            .collect();
 
         assert_eq!(cc_hk_004.len(), 1);
         assert_eq!(cc_hk_004[0].level, DiagnosticLevel::Error);
@@ -1348,7 +1506,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-004").collect();
+        let cc_hk_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-004")
+            .collect();
 
         assert_eq!(cc_hk_004.len(), 1);
     }
@@ -1368,7 +1529,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-004").collect();
+        let cc_hk_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-004")
+            .collect();
 
         assert_eq!(cc_hk_004.len(), 0);
     }
@@ -1377,7 +1541,10 @@ mod tests {
     fn test_fixture_matcher_on_wrong_event() {
         let content = include_str!("../../../../tests/fixtures/hooks/matcher-on-wrong-event.json");
         let diagnostics = validate(content);
-        let cc_hk_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-004").collect();
+        let cc_hk_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-004")
+            .collect();
         // Stop, SubagentStop, UserPromptSubmit, SessionStart all have matchers incorrectly
         assert_eq!(cc_hk_004.len(), 4);
     }
@@ -1399,11 +1566,16 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-005").collect();
+        let cc_hk_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-005")
+            .collect();
 
         assert_eq!(cc_hk_005.len(), 1);
         assert_eq!(cc_hk_005[0].level, DiagnosticLevel::Error);
-        assert!(cc_hk_005[0].message.contains("missing required 'type' field"));
+        assert!(cc_hk_005[0]
+            .message
+            .contains("missing required 'type' field"));
     }
 
     #[test]
@@ -1422,7 +1594,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-005").collect();
+        let cc_hk_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-005")
+            .collect();
 
         assert_eq!(cc_hk_005.len(), 2);
     }
@@ -1442,7 +1617,10 @@ mod tests {
         }"#;
 
         let diagnostics = validate(content);
-        let cc_hk_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-005").collect();
+        let cc_hk_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-005")
+            .collect();
 
         assert_eq!(cc_hk_005.len(), 0);
     }
@@ -1451,7 +1629,10 @@ mod tests {
     fn test_fixture_missing_type_field() {
         let content = include_str!("../../../../tests/fixtures/hooks/missing-type-field.json");
         let diagnostics = validate(content);
-        let cc_hk_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-005").collect();
+        let cc_hk_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-005")
+            .collect();
         // 3 hooks missing type field
         assert_eq!(cc_hk_005.len(), 3);
     }
@@ -1500,7 +1681,10 @@ mod tests {
         let diagnostics = validator.validate(Path::new("settings.json"), content, &config);
 
         // CC-HK-001 should not fire when hooks category is disabled
-        let cc_hk_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-001").collect();
+        let cc_hk_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-001")
+            .collect();
         assert_eq!(cc_hk_001.len(), 0);
     }
 
@@ -1526,7 +1710,10 @@ mod tests {
         let diagnostics = validator.validate(Path::new("settings.json"), content, &config);
 
         // CC-HK-006 should not fire when specifically disabled
-        let cc_hk_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-006").collect();
+        let cc_hk_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-006")
+            .collect();
         assert_eq!(cc_hk_006.len(), 0);
     }
 
@@ -1581,7 +1768,10 @@ mod tests {
         let diagnostics = validator.validate(Path::new("settings.json"), content, &config);
 
         // CC-HK-009 should not fire when specifically disabled
-        let cc_hk_009: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-HK-009").collect();
+        let cc_hk_009: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-HK-009")
+            .collect();
         assert_eq!(cc_hk_009.len(), 0);
     }
 }

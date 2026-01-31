@@ -1,5 +1,7 @@
 //! Diagnostic types and error reporting
 
+#![allow(unused_assignments)] // LintError fields used by miette derive macros
+
 use miette::{Diagnostic as MietteDiagnostic, SourceSpan};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -24,7 +26,13 @@ pub struct Fix {
 
 impl Fix {
     /// Create a replacement fix
-    pub fn replace(start: usize, end: usize, replacement: impl Into<String>, description: impl Into<String>, safe: bool) -> Self {
+    pub fn replace(
+        start: usize,
+        end: usize,
+        replacement: impl Into<String>,
+        description: impl Into<String>,
+        safe: bool,
+    ) -> Self {
         Self {
             start_byte: start,
             end_byte: end,
@@ -35,7 +43,12 @@ impl Fix {
     }
 
     /// Create an insertion fix (start == end)
-    pub fn insert(position: usize, text: impl Into<String>, description: impl Into<String>, safe: bool) -> Self {
+    pub fn insert(
+        position: usize,
+        text: impl Into<String>,
+        description: impl Into<String>,
+        safe: bool,
+    ) -> Self {
         Self {
             start_byte: position,
             end_byte: position,
@@ -162,10 +175,7 @@ pub enum LintError {
     },
 
     #[error("Failed to parse YAML frontmatter")]
-    #[diagnostic(
-        code(agnix::yaml_parse),
-        help("Check YAML syntax between --- markers")
-    )]
+    #[diagnostic(code(agnix::yaml_parse), help("Check YAML syntax between --- markers"))]
     YamlParse {
         #[source_code]
         src: String,

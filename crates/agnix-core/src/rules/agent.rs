@@ -3,11 +3,8 @@
 //! Validates Claude Code subagent definitions in `.claude/agents/*.md`
 
 use crate::{
-    config::LintConfig,
-    diagnostics::Diagnostic,
-    parsers::frontmatter::parse_frontmatter,
-    rules::Validator,
-    schemas::agent::AgentSchema,
+    config::LintConfig, diagnostics::Diagnostic, parsers::frontmatter::parse_frontmatter,
+    rules::Validator, schemas::agent::AgentSchema,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -116,38 +113,42 @@ impl Validator for AgentValidator {
         };
 
         // CC-AG-001: Missing name field
-        if config.is_rule_enabled("CC-AG-001") {
-            if schema.name.as_deref().unwrap_or("").trim().is_empty() {
-                diagnostics.push(
-                    Diagnostic::error(
-                        path.to_path_buf(),
-                        1,
-                        0,
-                        "CC-AG-001",
-                        "Agent frontmatter is missing required 'name' field".to_string(),
-                    )
-                    .with_suggestion("Add 'name: your-agent-name' to frontmatter".to_string()),
-                );
-            }
+        if config.is_rule_enabled("CC-AG-001")
+            && schema.name.as_deref().unwrap_or("").trim().is_empty()
+        {
+            diagnostics.push(
+                Diagnostic::error(
+                    path.to_path_buf(),
+                    1,
+                    0,
+                    "CC-AG-001",
+                    "Agent frontmatter is missing required 'name' field".to_string(),
+                )
+                .with_suggestion("Add 'name: your-agent-name' to frontmatter".to_string()),
+            );
         }
 
         // CC-AG-002: Missing description field
-        if config.is_rule_enabled("CC-AG-002") {
-            if schema.description.as_deref().unwrap_or("").trim().is_empty() {
-                diagnostics.push(
-                    Diagnostic::error(
-                        path.to_path_buf(),
-                        1,
-                        0,
-                        "CC-AG-002",
-                        "Agent frontmatter is missing required 'description' field".to_string(),
-                    )
-                    .with_suggestion(
-                        "Add 'description: Describe what this agent does' to frontmatter"
-                            .to_string(),
-                    ),
-                );
-            }
+        if config.is_rule_enabled("CC-AG-002")
+            && schema
+                .description
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .is_empty()
+        {
+            diagnostics.push(
+                Diagnostic::error(
+                    path.to_path_buf(),
+                    1,
+                    0,
+                    "CC-AG-002",
+                    "Agent frontmatter is missing required 'description' field".to_string(),
+                )
+                .with_suggestion(
+                    "Add 'description: Describe what this agent does' to frontmatter".to_string(),
+                ),
+            );
         }
 
         // CC-AG-003: Invalid model value
@@ -232,8 +233,7 @@ impl Validator for AgentValidator {
         if config.is_rule_enabled("CC-AG-006") {
             if let (Some(tools), Some(disallowed)) = (&schema.tools, &schema.disallowed_tools) {
                 let tools_set: HashSet<&str> = tools.iter().map(|s| s.as_str()).collect();
-                let disallowed_set: HashSet<&str> =
-                    disallowed.iter().map(|s| s.as_str()).collect();
+                let disallowed_set: HashSet<&str> = disallowed.iter().map(|s| s.as_str()).collect();
 
                 let conflicts: Vec<&str> =
                     tools_set.intersection(&disallowed_set).copied().collect();
@@ -294,7 +294,10 @@ description: A test agent
 Agent instructions here"#;
 
         let diagnostics = validate(content);
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
 
         assert_eq!(cc_ag_001.len(), 1);
         assert_eq!(cc_ag_001[0].level, DiagnosticLevel::Error);
@@ -310,7 +313,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
 
         assert_eq!(cc_ag_001.len(), 1);
     }
@@ -324,7 +330,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
 
         assert_eq!(cc_ag_001.len(), 1);
     }
@@ -338,7 +347,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
 
         assert_eq!(cc_ag_001.len(), 0);
     }
@@ -353,11 +365,16 @@ name: my-agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-002").collect();
+        let cc_ag_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-002")
+            .collect();
 
         assert_eq!(cc_ag_002.len(), 1);
         assert_eq!(cc_ag_002[0].level, DiagnosticLevel::Error);
-        assert!(cc_ag_002[0].message.contains("missing required 'description'"));
+        assert!(cc_ag_002[0]
+            .message
+            .contains("missing required 'description'"));
     }
 
     #[test]
@@ -369,7 +386,10 @@ description: ""
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-002").collect();
+        let cc_ag_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-002")
+            .collect();
 
         assert_eq!(cc_ag_002.len(), 1);
     }
@@ -383,7 +403,10 @@ description: This agent helps with testing
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-002").collect();
+        let cc_ag_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-002")
+            .collect();
 
         assert_eq!(cc_ag_002.len(), 0);
     }
@@ -400,7 +423,10 @@ model: gpt-4
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 1);
         assert_eq!(cc_ag_003[0].level, DiagnosticLevel::Error);
@@ -418,7 +444,10 @@ model: sonnet
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 0);
     }
@@ -433,7 +462,10 @@ model: opus
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 0);
     }
@@ -448,7 +480,10 @@ model: haiku
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 0);
     }
@@ -463,7 +498,10 @@ model: inherit
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 0);
     }
@@ -477,7 +515,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
 
         assert_eq!(cc_ag_003.len(), 0);
     }
@@ -494,7 +535,10 @@ permissionMode: admin
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 1);
         assert_eq!(cc_ag_004[0].level, DiagnosticLevel::Error);
@@ -512,7 +556,10 @@ permissionMode: default
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -527,7 +574,10 @@ permissionMode: acceptEdits
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -542,7 +592,10 @@ permissionMode: dontAsk
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -557,7 +610,10 @@ permissionMode: bypassPermissions
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -572,7 +628,10 @@ permissionMode: plan
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -586,7 +645,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
 
         assert_eq!(cc_ag_004.len(), 0);
     }
@@ -611,7 +673,10 @@ skills:
 Agent instructions"#;
 
         let diagnostics = validate_with_path(&agent_path, content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
 
         assert_eq!(cc_ag_005.len(), 1);
         assert_eq!(cc_ag_005[0].level, DiagnosticLevel::Error);
@@ -644,7 +709,10 @@ skills:
 Agent instructions"#;
 
         let diagnostics = validate_with_path(&agent_path, content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
 
         assert_eq!(cc_ag_005.len(), 0);
     }
@@ -669,7 +737,10 @@ skills:
 Agent instructions"#;
 
         let diagnostics = validate_with_path(&agent_path, content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
 
         assert_eq!(cc_ag_005.len(), 3);
     }
@@ -683,7 +754,10 @@ description: A test agent
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
 
         assert_eq!(cc_ag_005.len(), 0);
     }
@@ -706,7 +780,10 @@ disallowedTools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
 
         assert_eq!(cc_ag_006.len(), 1);
         assert_eq!(cc_ag_006[0].level, DiagnosticLevel::Error);
@@ -730,7 +807,10 @@ disallowedTools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
 
         assert_eq!(cc_ag_006.len(), 1);
         // Should mention both conflicting tools
@@ -752,7 +832,10 @@ disallowedTools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
 
         assert_eq!(cc_ag_006.len(), 0);
     }
@@ -769,7 +852,10 @@ tools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
 
         assert_eq!(cc_ag_006.len(), 0);
     }
@@ -786,7 +872,10 @@ disallowedTools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
 
         assert_eq!(cc_ag_006.len(), 0);
     }
@@ -804,7 +893,9 @@ Agent instructions"#;
             .collect();
 
         assert_eq!(parse_errors.len(), 1);
-        assert!(parse_errors[0].message.contains("must have YAML frontmatter"));
+        assert!(parse_errors[0]
+            .message
+            .contains("must have YAML frontmatter"));
     }
 
     #[test]
@@ -875,7 +966,10 @@ Agent instructions with full configuration"#;
     fn test_fixture_missing_name() {
         let content = include_str!("../../../../tests/fixtures/agents/missing-name.md");
         let diagnostics = validate(content);
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
         assert!(!cc_ag_001.is_empty());
     }
 
@@ -883,7 +977,10 @@ Agent instructions with full configuration"#;
     fn test_fixture_missing_description() {
         let content = include_str!("../../../../tests/fixtures/agents/missing-description.md");
         let diagnostics = validate(content);
-        let cc_ag_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-002").collect();
+        let cc_ag_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-002")
+            .collect();
         assert!(!cc_ag_002.is_empty());
     }
 
@@ -891,7 +988,10 @@ Agent instructions with full configuration"#;
     fn test_fixture_invalid_model() {
         let content = include_str!("../../../../tests/fixtures/agents/invalid-model.md");
         let diagnostics = validate(content);
-        let cc_ag_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-003").collect();
+        let cc_ag_003: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-003")
+            .collect();
         assert!(!cc_ag_003.is_empty());
     }
 
@@ -899,7 +999,10 @@ Agent instructions with full configuration"#;
     fn test_fixture_invalid_permission() {
         let content = include_str!("../../../../tests/fixtures/agents/invalid-permission.md");
         let diagnostics = validate(content);
-        let cc_ag_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-004").collect();
+        let cc_ag_004: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-004")
+            .collect();
         assert!(!cc_ag_004.is_empty());
     }
 
@@ -907,7 +1010,10 @@ Agent instructions with full configuration"#;
     fn test_fixture_tool_conflict() {
         let content = include_str!("../../../../tests/fixtures/agents/tool-conflict.md");
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
         assert!(!cc_ag_006.is_empty());
     }
 
@@ -934,7 +1040,10 @@ skills: []
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
         assert_eq!(cc_ag_005.len(), 0);
     }
 
@@ -950,7 +1059,10 @@ disallowedTools:
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
         assert_eq!(cc_ag_006.len(), 0);
     }
 
@@ -966,7 +1078,10 @@ disallowedTools: []
 Agent instructions"#;
 
         let diagnostics = validate(content);
-        let cc_ag_006: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-006").collect();
+        let cc_ag_006: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-006")
+            .collect();
         assert_eq!(cc_ag_006.len(), 0);
     }
 
@@ -989,7 +1104,10 @@ skills:
 Agent instructions"#;
 
         let diagnostics = validate_with_path(&agent_path, content);
-        let cc_ag_005: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-005").collect();
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
         // Should report as not found (rejected), not as a security breach
         assert_eq!(cc_ag_005.len(), 1);
     }
@@ -1021,7 +1139,10 @@ Agent instructions"#;
         let diagnostics = validator.validate(Path::new("test-agent.md"), content, &config);
 
         // CC-AG-001 should not fire when agents category is disabled
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
         assert_eq!(cc_ag_001.len(), 0);
     }
 
@@ -1040,11 +1161,17 @@ Agent instructions"#;
         let diagnostics = validator.validate(Path::new("test-agent.md"), content, &config);
 
         // CC-AG-001 should not fire when specifically disabled
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
         assert_eq!(cc_ag_001.len(), 0);
 
         // But CC-AG-002 should still fire (description is missing)
-        let cc_ag_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-002").collect();
+        let cc_ag_002: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-002")
+            .collect();
         assert_eq!(cc_ag_002.len(), 1);
     }
 
@@ -1087,7 +1214,10 @@ Agent instructions"#;
         let diagnostics = validator.validate(Path::new("test-agent.md"), content, &config);
 
         // CC-AG-001 should fire for ClaudeCode target
-        let cc_ag_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CC-AG-001").collect();
+        let cc_ag_001: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-001")
+            .collect();
         assert_eq!(cc_ag_001.len(), 1);
     }
 }

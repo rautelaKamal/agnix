@@ -1,10 +1,7 @@
 //! Skill file validation
 
 use crate::{
-    config::LintConfig,
-    diagnostics::Diagnostic,
-    parsers::parse_frontmatter,
-    rules::Validator,
+    config::LintConfig, diagnostics::Diagnostic, parsers::parse_frontmatter, rules::Validator,
     schemas::SkillSchema,
 };
 use std::path::Path;
@@ -37,40 +34,35 @@ impl Validator for SkillValidator {
                 }
 
                 // AS-005: Name cannot start or end with hyphen
-                if config.is_rule_enabled("AS-005") {
-                    if schema.name.starts_with('-') || schema.name.ends_with('-') {
-                        diagnostics.push(
-                            Diagnostic::error(
-                                path.to_path_buf(),
-                                1,
-                                0,
-                                "AS-005",
-                                format!("Name '{}' cannot start or end with hyphen", schema.name),
-                            )
-                            .with_suggestion(
-                                "Remove leading/trailing hyphens from the name".to_string(),
-                            ),
-                        );
-                    }
+                if config.is_rule_enabled("AS-005")
+                    && (schema.name.starts_with('-') || schema.name.ends_with('-'))
+                {
+                    diagnostics.push(
+                        Diagnostic::error(
+                            path.to_path_buf(),
+                            1,
+                            0,
+                            "AS-005",
+                            format!("Name '{}' cannot start or end with hyphen", schema.name),
+                        )
+                        .with_suggestion(
+                            "Remove leading/trailing hyphens from the name".to_string(),
+                        ),
+                    );
                 }
 
                 // AS-006: Name cannot contain consecutive hyphens
-                if config.is_rule_enabled("AS-006") {
-                    if schema.name.contains("--") {
-                        diagnostics.push(
-                            Diagnostic::error(
-                                path.to_path_buf(),
-                                1,
-                                0,
-                                "AS-006",
-                                format!(
-                                    "Name '{}' cannot contain consecutive hyphens",
-                                    schema.name
-                                ),
-                            )
-                            .with_suggestion("Replace '--' with '-' in the name".to_string()),
-                        );
-                    }
+                if config.is_rule_enabled("AS-006") && schema.name.contains("--") {
+                    diagnostics.push(
+                        Diagnostic::error(
+                            path.to_path_buf(),
+                            1,
+                            0,
+                            "AS-006",
+                            format!("Name '{}' cannot contain consecutive hyphens", schema.name),
+                        )
+                        .with_suggestion("Replace '--' with '-' in the name".to_string()),
+                    );
                 }
 
                 // AS-010: Description should include trigger phrase
@@ -98,9 +90,10 @@ impl Validator for SkillValidator {
                     const DANGEROUS_NAMES: &[&str] =
                         &["deploy", "ship", "publish", "delete", "release", "push"];
                     let name_lower = schema.name.to_lowercase();
-                    if DANGEROUS_NAMES.iter().any(|d| name_lower.contains(d)) {
-                        if !schema.disable_model_invocation.unwrap_or(false) {
-                            diagnostics.push(Diagnostic::error(
+                    if DANGEROUS_NAMES.iter().any(|d| name_lower.contains(d))
+                        && !schema.disable_model_invocation.unwrap_or(false)
+                    {
+                        diagnostics.push(Diagnostic::error(
                                 path.to_path_buf(),
                                 1,
                                 0,
@@ -110,7 +103,6 @@ impl Validator for SkillValidator {
                                     schema.name
                                 ),
                             ).with_suggestion("Add 'disable-model-invocation: true' to the frontmatter".to_string()));
-                        }
                     }
                 }
 
@@ -162,11 +154,7 @@ description: Use when testing skill validation
 Skill body content"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         assert!(diagnostics.is_empty());
     }
@@ -180,11 +168,7 @@ description: A test skill
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         assert!(!diagnostics.is_empty());
     }
@@ -198,11 +182,7 @@ description: Deploys to production
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         // Should have an error for CC-SK-006
         let cc_sk_006_errors: Vec<_> = diagnostics
@@ -211,7 +191,10 @@ Body"#;
             .collect();
 
         assert_eq!(cc_sk_006_errors.len(), 1);
-        assert_eq!(cc_sk_006_errors[0].level, crate::diagnostics::DiagnosticLevel::Error);
+        assert_eq!(
+            cc_sk_006_errors[0].level,
+            crate::diagnostics::DiagnosticLevel::Error
+        );
     }
 
     #[test]
@@ -224,11 +207,7 @@ disable-model-invocation: true
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         // Should NOT have an error for CC-SK-006
         let cc_sk_006_errors: Vec<_> = diagnostics
@@ -254,11 +233,8 @@ Body"#,
             );
 
             let validator = SkillValidator;
-            let diagnostics = validator.validate(
-                Path::new("test.md"),
-                &content,
-                &LintConfig::default(),
-            );
+            let diagnostics =
+                validator.validate(Path::new("test.md"), &content, &LintConfig::default());
 
             // Should have an error for CC-SK-006
             let cc_sk_006_errors: Vec<_> = diagnostics
@@ -285,11 +261,7 @@ allowed-tools: Bash Read Write
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         // Should have a warning for CC-SK-007
         let cc_sk_007_warnings: Vec<_> = diagnostics
@@ -314,11 +286,7 @@ allowed-tools: Bash(git:*) Read Write
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         // Should NOT have a warning for CC-SK-007 (scoped Bash is ok)
         let cc_sk_007_warnings: Vec<_> = diagnostics
@@ -339,11 +307,7 @@ allowed-tools: Read Write
 Body"#;
 
         let validator = SkillValidator;
-        let diagnostics = validator.validate(
-            Path::new("test.md"),
-            content,
-            &LintConfig::default(),
-        );
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
         // Should NOT have a warning for CC-SK-007 (no Bash at all)
         let cc_sk_007_warnings: Vec<_> = diagnostics
@@ -365,13 +329,13 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_005_errors: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-005")
-            .collect();
+        let as_005_errors: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-005").collect();
 
         assert_eq!(as_005_errors.len(), 1);
-        assert_eq!(as_005_errors[0].level, crate::diagnostics::DiagnosticLevel::Error);
+        assert_eq!(
+            as_005_errors[0].level,
+            crate::diagnostics::DiagnosticLevel::Error
+        );
     }
 
     #[test]
@@ -385,13 +349,13 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_005_errors: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-005")
-            .collect();
+        let as_005_errors: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-005").collect();
 
         assert_eq!(as_005_errors.len(), 1);
-        assert_eq!(as_005_errors[0].level, crate::diagnostics::DiagnosticLevel::Error);
+        assert_eq!(
+            as_005_errors[0].level,
+            crate::diagnostics::DiagnosticLevel::Error
+        );
     }
 
     #[test]
@@ -405,13 +369,13 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_006_errors: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-006")
-            .collect();
+        let as_006_errors: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-006").collect();
 
         assert_eq!(as_006_errors.len(), 1);
-        assert_eq!(as_006_errors[0].level, crate::diagnostics::DiagnosticLevel::Error);
+        assert_eq!(
+            as_006_errors[0].level,
+            crate::diagnostics::DiagnosticLevel::Error
+        );
     }
 
     #[test]
@@ -425,13 +389,13 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_010_warnings: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-010")
-            .collect();
+        let as_010_warnings: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
 
         assert_eq!(as_010_warnings.len(), 1);
-        assert_eq!(as_010_warnings[0].level, crate::diagnostics::DiagnosticLevel::Warning);
+        assert_eq!(
+            as_010_warnings[0].level,
+            crate::diagnostics::DiagnosticLevel::Warning
+        );
     }
 
     #[test]
@@ -445,10 +409,7 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_010_warnings: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-010")
-            .collect();
+        let as_010_warnings: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
 
         assert_eq!(as_010_warnings.len(), 0);
     }
@@ -464,10 +425,7 @@ Body"#;
         let validator = SkillValidator;
         let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
 
-        let as_010_warnings: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.rule == "AS-010")
-            .collect();
+        let as_010_warnings: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
 
         assert_eq!(as_010_warnings.len(), 0);
     }
