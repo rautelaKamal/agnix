@@ -15,6 +15,7 @@ agnix .
 - ✅ **Agent Skills** - Validates SKILL.md format (agentskills.io spec)
 - ✅ **Claude Code** - CLAUDE.md, hooks, subagents, plugins
 - ✅ **Subagents** - Agent frontmatter validation (CC-AG-001 to CC-AG-006)
+- ✅ **Plugins** - Plugin manifest validation (CC-PL-001 to CC-PL-005)
 - ✅ **Generic Instructions** - Detects redundant "be helpful" patterns
 - ✅ **XML Balance** - Ensures tags are properly closed
 - ✅ **@imports** - Validates file references exist
@@ -82,8 +83,11 @@ CLAUDE.md:15:1 warning: Generic instruction 'Be helpful and accurate' [fixable]
 .claude/agents/researcher.md:1:0 error: Agent frontmatter is missing required 'name' field
   help: Add 'name: your-agent-name' to frontmatter
 
+.claude-plugin/plugin.json:1:0 error: Missing required field 'version'
+  help: Add 'version' field with semver format (e.g., "1.0.0")
+
 ────────────────────────────────────────────────────────────
-Found 3 errors, 1 warning
+Found 4 errors, 1 warning
   2 issues are automatically fixable
 
 hint: Run with --fix to apply fixes
@@ -195,6 +199,7 @@ agnix/
 - [x] Parallel file validation
 - [x] Config-based rule filtering
 - [x] Auto-fix infrastructure (--fix, --dry-run, --fix-safe)
+- [x] Plugin validation (CC-PL-001 to CC-PL-005)
 - [ ] MCP tool validation
 - [ ] LSP server
 - [ ] VS Code extension

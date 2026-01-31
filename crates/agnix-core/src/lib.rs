@@ -37,7 +37,7 @@ pub enum FileType {
     Agent,
     /// settings.json, settings.local.json
     Hooks,
-    /// plugin.json in .claude-plugin/
+    /// plugin.json (validator checks .claude-plugin/ location)
     Plugin,
     /// Other .md files (for XML/import checks)
     GenericMarkdown,
@@ -62,9 +62,8 @@ pub fn detect_file_type(path: &Path) -> FileType {
         "SKILL.md" => FileType::Skill,
         "CLAUDE.md" | "AGENTS.md" => FileType::ClaudeMd,
         "settings.json" | "settings.local.json" => FileType::Hooks,
-        "plugin.json" if parent.map_or(false, |p| p.ends_with(".claude-plugin")) => {
-            FileType::Plugin
-        }
+        // Classify any plugin.json as Plugin - validator checks location constraint (CC-PL-001)
+        "plugin.json" => FileType::Plugin,
         name if name.ends_with(".md") => {
             if parent == Some("agents") || grandparent == Some("agents") {
                 FileType::Agent
@@ -243,12 +242,19 @@ mod tests {
 
     #[test]
     fn test_detect_plugin() {
+        // plugin.json in .claude-plugin/ directory
         assert_eq!(
             detect_file_type(Path::new("my-plugin.claude-plugin/plugin.json")),
             FileType::Plugin
         );
-        assert_ne!(
+        // plugin.json outside .claude-plugin/ is still classified as Plugin
+        // (validator checks location constraint CC-PL-001)
+        assert_eq!(
             detect_file_type(Path::new("some/plugin.json")),
+            FileType::Plugin
+        );
+        assert_eq!(
+            detect_file_type(Path::new("plugin.json")),
             FileType::Plugin
         );
     }
@@ -550,6 +556,39 @@ mod tests {
         assert!(
             error_diagnostics.iter().all(|d| d.file.to_string_lossy().contains("invalid")),
             "Errors should only come from the invalid skill"
+        );
+    }
+
+    #[test]
+    fn test_validate_project_plugin_detection() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let plugin_dir = temp.path().join("my-plugin.claude-plugin");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+
+        // Create plugin.json with a validation issue (missing description - CC-PL-004)
+        std::fs::write(
+            plugin_dir.join("plugin.json"),
+            r#"{"name": "test-plugin", "version": "1.0.0"}"#,
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let diagnostics = validate_project(temp.path(), &config).unwrap();
+
+        // Should detect the plugin.json and report CC-PL-004 for missing description
+        let plugin_diagnostics: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule.starts_with("CC-PL-"))
+            .collect();
+
+        assert!(
+            !plugin_diagnostics.is_empty(),
+            "validate_project() should detect and validate plugin.json files"
+        );
+
+        assert!(
+            plugin_diagnostics.iter().any(|d| d.rule == "CC-PL-004"),
+            "Should report CC-PL-004 for missing description field"
         );
     }
 }
