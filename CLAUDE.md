@@ -15,6 +15,7 @@
 7. **Task is not done until tests added** - Every feature/fix must have quality tests
 8. **Documentation** - Update README, SPEC.md, RULES.md as needed, dont use CLAUDE.md for docs and tracking
 9. **Always follow the skill/command flow as instructed** - No deviations
+10. **No unnecessary files** - Don't create summary files, plan files, or temp docs unless specifically required
 
 ## Architecture
 
