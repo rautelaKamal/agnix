@@ -1,0 +1,21 @@
+[package]
+name = "agnix-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "CLI for agnix - agent config linter"
+
+[[bin]]
+name = "agnix"
+path = "src/main.rs"
+
+[dependencies]
+agnix-core = { path = "../agnix-core" }
+clap.workspace = true
+colored.workspace = true
+miette = { workspace = true, features = ["fancy"] }
+anyhow.workspace = true
+toml = "0.8"

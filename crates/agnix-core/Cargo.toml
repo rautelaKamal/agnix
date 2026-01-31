@@ -1,0 +1,27 @@
+[package]
+name = "agnix-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+description = "Core validation engine for agent configurations"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+pulldown-cmark.workspace = true
+regex.workspace = true
+walkdir.workspace = true
+ignore.workspace = true
+glob.workspace = true
+miette.workspace = true
+dirs = "5"
+toml = "0.8"
+
+[dev-dependencies]
+tempfile = "3"
