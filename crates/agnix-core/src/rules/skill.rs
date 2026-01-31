@@ -7,7 +7,7 @@ use crate::{
     rules::Validator,
     schemas::SkillSchema,
 };
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct SkillValidator;
 
@@ -34,6 +34,41 @@ impl Validator for SkillValidator {
                         "skill::schema",
                         error,
                     ));
+                }
+
+                // CC-SK-006: Dangerous auto-invocation check
+                const DANGEROUS_NAMES: &[&str] = &["deploy", "ship", "publish", "delete", "release", "push"];
+                let name_lower = schema.name.to_lowercase();
+                if DANGEROUS_NAMES.iter().any(|d| name_lower.contains(d)) {
+                    if !schema.disable_model_invocation.unwrap_or(false) {
+                        diagnostics.push(Diagnostic::error(
+                            path.to_path_buf(),
+                            1,
+                            0,
+                            "CC-SK-006",
+                            format!(
+                                "Dangerous skill '{}' must set 'disable-model-invocation: true' to prevent accidental invocation",
+                                schema.name
+                            ),
+                        ).with_suggestion("Add 'disable-model-invocation: true' to the frontmatter".to_string()));
+                    }
+                }
+
+                // CC-SK-007: Unrestricted Bash warning
+                if let Some(tools) = &schema.allowed_tools {
+                    // Parse space-delimited tool list
+                    let tool_list: Vec<&str> = tools.split_whitespace().collect();
+                    for tool in tool_list {
+                        if tool == "Bash" {
+                            diagnostics.push(Diagnostic::warning(
+                                path.to_path_buf(),
+                                1,
+                                0,
+                                "CC-SK-007",
+                                "Unrestricted Bash access detected. Consider using scoped version for better security.".to_string(),
+                            ).with_suggestion("Use scoped Bash like 'Bash(git:*)' or 'Bash(npm:*)' instead of plain 'Bash'".to_string()));
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -90,5 +125,170 @@ Body"#;
         );
 
         assert!(!diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_cc_sk_006_dangerous_name_without_safety() {
+        let content = r#"---
+name: deploy-prod
+description: Deploys to production
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(
+            Path::new("test.md"),
+            content,
+            &LintConfig::default(),
+        );
+
+        // Should have an error for CC-SK-006
+        let cc_sk_006_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-SK-006")
+            .collect();
+
+        assert_eq!(cc_sk_006_errors.len(), 1);
+        assert_eq!(cc_sk_006_errors[0].level, crate::diagnostics::DiagnosticLevel::Error);
+    }
+
+    #[test]
+    fn test_cc_sk_006_dangerous_name_with_safety() {
+        let content = r#"---
+name: deploy-prod
+description: Deploys to production
+disable-model-invocation: true
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(
+            Path::new("test.md"),
+            content,
+            &LintConfig::default(),
+        );
+
+        // Should NOT have an error for CC-SK-006
+        let cc_sk_006_errors: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-SK-006")
+            .collect();
+
+        assert_eq!(cc_sk_006_errors.len(), 0);
+    }
+
+    #[test]
+    fn test_cc_sk_006_covers_all_dangerous_names() {
+        let dangerous_names = vec!["deploy", "ship", "publish", "delete", "release", "push"];
+
+        for name in dangerous_names {
+            let content = format!(
+                r#"---
+name: {}-prod
+description: A dangerous skill
+---
+Body"#,
+                name
+            );
+
+            let validator = SkillValidator;
+            let diagnostics = validator.validate(
+                Path::new("test.md"),
+                &content,
+                &LintConfig::default(),
+            );
+
+            // Should have an error for CC-SK-006
+            let cc_sk_006_errors: Vec<_> = diagnostics
+                .iter()
+                .filter(|d| d.rule == "CC-SK-006")
+                .collect();
+
+            assert_eq!(
+                cc_sk_006_errors.len(),
+                1,
+                "Expected CC-SK-006 error for name: {}",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_cc_sk_007_unrestricted_bash() {
+        let content = r#"---
+name: git-helper
+description: Git operations helper
+allowed-tools: Bash Read Write
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(
+            Path::new("test.md"),
+            content,
+            &LintConfig::default(),
+        );
+
+        // Should have a warning for CC-SK-007
+        let cc_sk_007_warnings: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-SK-007")
+            .collect();
+
+        assert_eq!(cc_sk_007_warnings.len(), 1);
+        assert_eq!(
+            cc_sk_007_warnings[0].level,
+            crate::diagnostics::DiagnosticLevel::Warning
+        );
+    }
+
+    #[test]
+    fn test_cc_sk_007_scoped_bash_ok() {
+        let content = r#"---
+name: git-helper
+description: Git operations helper
+allowed-tools: Bash(git:*) Read Write
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(
+            Path::new("test.md"),
+            content,
+            &LintConfig::default(),
+        );
+
+        // Should NOT have a warning for CC-SK-007 (scoped Bash is ok)
+        let cc_sk_007_warnings: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-SK-007")
+            .collect();
+
+        assert_eq!(cc_sk_007_warnings.len(), 0);
+    }
+
+    #[test]
+    fn test_cc_sk_007_no_bash() {
+        let content = r#"---
+name: reader
+description: File reader
+allowed-tools: Read Write
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(
+            Path::new("test.md"),
+            content,
+            &LintConfig::default(),
+        );
+
+        // Should NOT have a warning for CC-SK-007 (no Bash at all)
+        let cc_sk_007_warnings: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-SK-007")
+            .collect();
+
+        assert_eq!(cc_sk_007_warnings.len(), 0);
     }
 }
