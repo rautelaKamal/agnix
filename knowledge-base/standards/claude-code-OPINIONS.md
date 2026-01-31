@@ -387,9 +387,9 @@ cp .env.example .env.local
 - PR requirements: Tests pass, code review approval
 
 ## Resources
-- API docs: @docs/api.md
-- Design system: @docs/design-system.md
-- Deployment: @docs/deployment.md
+- API docs: `@docs/api.md`
+- Design system: `@docs/design-system.md`
+- Deployment: `@docs/deployment.md`
 ```
 
 ### 3.2 Best Practices
