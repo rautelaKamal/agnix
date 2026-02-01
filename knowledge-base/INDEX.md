@@ -12,7 +12,7 @@
 | **Understand a standard** | [standards/](#standards) - HARD-RULES files |
 | **Learn best practices** | [standards/](#standards) - OPINIONS files |
 | **Find patterns** | [PATTERNS-CATALOG.md](./PATTERNS-CATALOG.md) - 70 patterns from awesome-slash |
-| **Get architectural context** | [agent-docs/](#agent-docs) - 12 reference docs |
+| **Get platform context** | [agent-docs/](#agent-docs) - 10 reference docs |
 | **Cross-platform support** | [standards/multi-platform-HARD-RULES.md](./standards/multi-platform-HARD-RULES.md) |
 
 ---
@@ -243,7 +243,7 @@ Update knowledge base when:
 
 ```
 Total Documents:       26 files
-Total Lines:          17,654 lines
+Total Lines:          17,647 lines
 Total Size:           492KB
 Standards Covered:     5 (Agent Skills, MCP, Claude Code, Multi-Platform, Prompt Eng)
 Sources Consulted:    75+ (specs, docs, research papers, repos)

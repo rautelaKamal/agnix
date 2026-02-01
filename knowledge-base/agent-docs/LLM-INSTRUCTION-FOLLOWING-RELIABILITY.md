@@ -724,13 +724,6 @@ Research distinguishes:
 3. Multi-turn conversations degrade performance by ~39%
 4. Tool calling introduces additional reliability challenges
 
-### For Production Systems
-
-1. Expect 41-86.7% failure rates in multi-agent systems
-2. Specification and coordination cause ~79% of failures
-3. Monitor everything: latency, errors, quality scores
-4. Implement structured logging with correlation IDs
-
 ### For Safety
 
 1. Safety alignment is "shallow" - primarily first few tokens
