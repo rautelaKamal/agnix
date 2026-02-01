@@ -210,6 +210,20 @@ mod tests {
     }
 
     #[test]
+    fn test_repo_agents_md_matches_claude_md() {
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = manifest_dir
+            .ancestors()
+            .nth(2)
+            .expect("Failed to locate repo root from CARGO_MANIFEST_DIR");
+
+        let claude = std::fs::read_to_string(repo_root.join("CLAUDE.md")).unwrap();
+        let agents = std::fs::read_to_string(repo_root.join("AGENTS.md")).unwrap();
+
+        assert_eq!(agents, claude, "AGENTS.md must match CLAUDE.md");
+    }
+
+    #[test]
     fn test_detect_agents() {
         assert_eq!(
             detect_file_type(Path::new("agents/my-agent.md")),
