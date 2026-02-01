@@ -1231,8 +1231,9 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_command() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/missing-command-field/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/missing-command-field/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_006: Vec<_> = diagnostics
             .iter()
@@ -1243,8 +1244,9 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_prompt() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/missing-prompt-field/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/missing-prompt-field/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_007: Vec<_> = diagnostics
             .iter()
@@ -1255,8 +1257,9 @@ mod tests {
 
     #[test]
     fn test_fixture_dangerous_commands() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/dangerous-commands/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/dangerous-commands/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_009: Vec<_> = diagnostics
             .iter()
@@ -1496,8 +1499,9 @@ mod tests {
 
     #[test]
     fn test_fixture_prompt_on_wrong_event() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/prompt-on-wrong-event/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/prompt-on-wrong-event/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_002: Vec<_> = diagnostics
             .iter()
@@ -1694,8 +1698,9 @@ mod tests {
 
     #[test]
     fn test_fixture_matcher_on_wrong_event() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/matcher-on-wrong-event/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/matcher-on-wrong-event/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_004: Vec<_> = diagnostics
             .iter()
@@ -1783,8 +1788,9 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_type_field() {
-        let content =
-            include_str!("../../../../tests/fixtures/invalid/hooks/missing-type-field/settings.json");
+        let content = include_str!(
+            "../../../../tests/fixtures/invalid/hooks/missing-type-field/settings.json"
+        );
         let diagnostics = validate(content);
         let cc_hk_005: Vec<_> = diagnostics
             .iter()
