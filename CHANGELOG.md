@@ -114,6 +114,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All validators now respect config-based category toggles and disabled rules
 - Config structure enhanced with category-based toggles (legacy flags still supported)
 - Knowledge base docs refreshed (rule counts, AGENTS.md support tiers, Cursor rules)
+- Fixture layout aligned with detector paths to ensure validators exercise fixtures directly
+- CC-HK-010 now treats timeouts above the default limit as a soft warning
 
 ### Performance
 - Significant speed improvements on projects with many files
