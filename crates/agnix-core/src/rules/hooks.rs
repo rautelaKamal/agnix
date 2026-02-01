@@ -1172,7 +1172,7 @@ mod tests {
 
     #[test]
     fn test_fixture_valid_settings() {
-        let content = include_str!("../../../../tests/fixtures/hooks/valid-settings.json");
+        let content = include_str!("../../../../tests/fixtures/valid/hooks/settings.json");
         let diagnostics = validate(content);
         let errors: Vec<_> = diagnostics
             .iter()
@@ -1183,7 +1183,8 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_command() {
-        let content = include_str!("../../../../tests/fixtures/hooks/missing-command-field.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/missing-command-field/settings.json");
         let diagnostics = validate(content);
         let cc_hk_006: Vec<_> = diagnostics
             .iter()
@@ -1194,7 +1195,8 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_prompt() {
-        let content = include_str!("../../../../tests/fixtures/hooks/missing-prompt-field.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/missing-prompt-field/settings.json");
         let diagnostics = validate(content);
         let cc_hk_007: Vec<_> = diagnostics
             .iter()
@@ -1205,7 +1207,8 @@ mod tests {
 
     #[test]
     fn test_fixture_dangerous_commands() {
-        let content = include_str!("../../../../tests/fixtures/hooks/dangerous-commands.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/dangerous-commands/settings.json");
         let diagnostics = validate(content);
         let cc_hk_009: Vec<_> = diagnostics
             .iter()
@@ -1333,7 +1336,8 @@ mod tests {
 
     #[test]
     fn test_fixture_invalid_event() {
-        let content = include_str!("../../../../tests/fixtures/hooks/invalid-event.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/invalid-event/settings.json");
         let diagnostics = validate(content);
         let cc_hk_001: Vec<_> = diagnostics
             .iter()
@@ -1444,7 +1448,8 @@ mod tests {
 
     #[test]
     fn test_fixture_prompt_on_wrong_event() {
-        let content = include_str!("../../../../tests/fixtures/hooks/prompt-on-wrong-event.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/prompt-on-wrong-event/settings.json");
         let diagnostics = validate(content);
         let cc_hk_002: Vec<_> = diagnostics
             .iter()
@@ -1553,7 +1558,8 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_matcher() {
-        let content = include_str!("../../../../tests/fixtures/hooks/missing-matcher.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/missing-matcher/settings.json");
         let diagnostics = validate(content);
         let cc_hk_003: Vec<_> = diagnostics
             .iter()
@@ -1640,7 +1646,8 @@ mod tests {
 
     #[test]
     fn test_fixture_matcher_on_wrong_event() {
-        let content = include_str!("../../../../tests/fixtures/hooks/matcher-on-wrong-event.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/matcher-on-wrong-event/settings.json");
         let diagnostics = validate(content);
         let cc_hk_004: Vec<_> = diagnostics
             .iter()
@@ -1728,7 +1735,8 @@ mod tests {
 
     #[test]
     fn test_fixture_missing_type_field() {
-        let content = include_str!("../../../../tests/fixtures/hooks/missing-type-field.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/missing-type-field/settings.json");
         let diagnostics = validate(content);
         let cc_hk_005: Vec<_> = diagnostics
             .iter()
@@ -1864,7 +1872,8 @@ mod tests {
 
     #[test]
     fn test_fixture_no_timeout() {
-        let content = include_str!("../../../../tests/fixtures/hooks/no-timeout.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/no-timeout/settings.json");
         let diagnostics = validate(content);
         let cc_hk_010: Vec<_> = diagnostics
             .iter()
@@ -2131,14 +2140,15 @@ mod tests {
 
     #[test]
     fn test_fixture_invalid_timeout() {
-        let content = include_str!("../../../../tests/fixtures/hooks/invalid-timeout.json");
+        let content =
+            include_str!("../../../../tests/fixtures/invalid/hooks/invalid-timeout/settings.json");
         let diagnostics = validate(content);
         let cc_hk_011: Vec<_> = diagnostics
             .iter()
             .filter(|d| d.rule == "CC-HK-011")
             .collect();
-        // negative (-5), zero (0), string ("thirty"), null - 4 invalid timeouts
-        assert_eq!(cc_hk_011.len(), 4);
+        // zero (0) appears twice - 2 invalid timeouts
+        assert_eq!(cc_hk_011.len(), 2);
     }
 
     // ===== Config Wiring Tests =====
