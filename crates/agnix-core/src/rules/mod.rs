@@ -5,6 +5,7 @@ pub mod claude_md;
 pub mod cross_platform;
 pub mod hooks;
 pub mod imports;
+pub mod mcp;
 pub mod plugin;
 pub mod skill;
 pub mod xml;

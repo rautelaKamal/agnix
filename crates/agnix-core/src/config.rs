@@ -72,6 +72,10 @@ pub struct RuleConfig {
     #[serde(default = "default_true")]
     pub xml: bool,
 
+    /// Enable MCP validation (MCP-*)
+    #[serde(default = "default_true")]
+    pub mcp: bool,
+
     /// Enable import reference validation (REF-*)
     #[serde(default = "default_true")]
     pub imports: bool,
@@ -118,6 +122,7 @@ impl Default for RuleConfig {
             memory: true,
             plugins: true,
             xml: true,
+            mcp: true,
             imports: true,
             cross_platform: true,
             generic_instructions: true,
@@ -196,6 +201,7 @@ impl LintConfig {
             s if s.starts_with("CC-MEM-") => self.rules.memory,
             s if s.starts_with("CC-PL-") => self.rules.plugins,
             s if s.starts_with("XML-") || s.starts_with("xml::") => self.rules.xml,
+            s if s.starts_with("MCP-") => self.rules.mcp,
             s if s.starts_with("REF-") || s.starts_with("imports::") => self.rules.imports,
             s if s.starts_with("XP-") => self.rules.cross_platform,
             // Unknown rules are enabled by default
@@ -448,9 +454,41 @@ exclude = []
         assert!(config.rules.memory);
         assert!(config.rules.plugins);
         assert!(config.rules.xml);
+        assert!(config.rules.mcp);
         assert!(config.rules.imports);
         assert!(config.rules.cross_platform);
         assert!(config.rules.disabled_rules.is_empty());
+    }
+
+    // ===== MCP Category Tests =====
+
+    #[test]
+    fn test_category_disabled_mcp() {
+        let mut config = LintConfig::default();
+        config.rules.mcp = false;
+
+        assert!(!config.is_rule_enabled("MCP-001"));
+        assert!(!config.is_rule_enabled("MCP-002"));
+        assert!(!config.is_rule_enabled("MCP-003"));
+        assert!(!config.is_rule_enabled("MCP-004"));
+        assert!(!config.is_rule_enabled("MCP-005"));
+        assert!(!config.is_rule_enabled("MCP-006"));
+
+        // Other categories still enabled
+        assert!(config.is_rule_enabled("CC-AG-001"));
+        assert!(config.is_rule_enabled("AS-005"));
+    }
+
+    #[test]
+    fn test_mcp_rules_enabled_by_default() {
+        let config = LintConfig::default();
+
+        assert!(config.is_rule_enabled("MCP-001"));
+        assert!(config.is_rule_enabled("MCP-002"));
+        assert!(config.is_rule_enabled("MCP-003"));
+        assert!(config.is_rule_enabled("MCP-004"));
+        assert!(config.is_rule_enabled("MCP-005"));
+        assert!(config.is_rule_enabled("MCP-006"));
     }
 
     // ===== Cross-Platform Category Tests =====
