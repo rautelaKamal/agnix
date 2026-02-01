@@ -517,4 +517,34 @@ mod tests {
         ids.dedup();
         assert_eq!(ids.len(), original_len, "Should have no duplicate rule IDs");
     }
+
+    #[test]
+    fn test_help_uri_format_and_anchor() {
+        let rules = get_all_rules();
+        const BASE_URL: &str =
+            "https://github.com/avifenesh/agnix/blob/main/knowledge-base/VALIDATION-RULES.md#";
+
+        for rule in rules {
+            let uri = rule.help_uri.expect("All rules should have help_uri");
+
+            assert!(
+                uri.starts_with(BASE_URL),
+                "Rule {} has invalid help_uri base: {}",
+                rule.id,
+                uri
+            );
+
+            let anchor = uri
+                .strip_prefix(BASE_URL)
+                .expect("Anchor should be present");
+
+            assert_eq!(
+                anchor,
+                rule.id.to_lowercase(),
+                "Anchor for rule {} should be its lowercase ID, but was '{}'",
+                rule.id,
+                anchor
+            );
+        }
+    }
 }
