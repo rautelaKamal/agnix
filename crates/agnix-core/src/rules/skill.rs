@@ -1,6 +1,12 @@
 //! Skill file validation
 
-use crate::{config::LintConfig, diagnostics::Diagnostic, rules::Validator, schemas::SkillSchema};
+use crate::{
+    config::LintConfig,
+    diagnostics::Diagnostic,
+    parsers::frontmatter::{split_frontmatter, FrontmatterParts},
+    rules::Validator,
+    schemas::SkillSchema,
+};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -28,17 +34,17 @@ struct SkillFrontmatter {
     agent: Option<String>,
 }
 
-struct FrontmatterParts {
-    has_frontmatter: bool,
-    has_closing: bool,
-    frontmatter: String,
-    body: String,
+#[derive(Debug, Clone)]
+struct PathMatch {
+    path: String,
+    start: usize,
 }
 
 static NAME_FORMAT_REGEX: OnceLock<Regex> = OnceLock::new();
 static DESCRIPTION_XML_REGEX: OnceLock<Regex> = OnceLock::new();
 static REFERENCE_PATH_REGEX: OnceLock<Regex> = OnceLock::new();
 static WINDOWS_PATH_REGEX: OnceLock<Regex> = OnceLock::new();
+static WINDOWS_PATH_TOKEN_REGEX: OnceLock<Regex> = OnceLock::new();
 
 pub struct SkillValidator;
 
@@ -51,14 +57,23 @@ impl Validator for SkillValidator {
         }
 
         let parts = split_frontmatter(content);
+        let line_starts = compute_line_starts(content);
+        let body_raw = if parts.body_start <= content.len() {
+            &content[parts.body_start..]
+        } else {
+            ""
+        };
+        let (frontmatter_line, frontmatter_col) =
+            line_col_at(parts.frontmatter_start, &line_starts);
+        let (body_line, body_col) = line_col_at(parts.body_start, &line_starts);
 
         // AS-001: Missing frontmatter
         if config.is_rule_enabled("AS-001") && (!parts.has_frontmatter || !parts.has_closing) {
             diagnostics.push(
                 Diagnostic::error(
                     path.to_path_buf(),
-                    1,
-                    0,
+                    frontmatter_line,
+                    frontmatter_col,
                     "AS-001",
                     "SKILL.md must have YAML frontmatter between --- markers".to_string(),
                 )
@@ -72,8 +87,8 @@ impl Validator for SkillValidator {
                 Err(e) => {
                     diagnostics.push(Diagnostic::error(
                         path.to_path_buf(),
-                        1,
-                        0,
+                        frontmatter_line,
+                        frontmatter_col,
                         "skill::parse",
                         format!("Failed to parse SKILL.md: {}", e),
                     ));
@@ -85,13 +100,25 @@ impl Validator for SkillValidator {
         };
 
         if let Some(frontmatter) = frontmatter {
+            let (name_line, name_col) =
+                frontmatter_key_line_col(&parts, "name", &line_starts);
+            let (description_line, description_col) =
+                frontmatter_key_line_col(&parts, "description", &line_starts);
+            let (compat_line, compat_col) =
+                frontmatter_key_line_col(&parts, "compatibility", &line_starts);
+            let (allowed_tools_line, allowed_tools_col) =
+                frontmatter_key_line_col(&parts, "allowed-tools", &line_starts);
+            let (model_line, model_col) =
+                frontmatter_key_line_col(&parts, "model", &line_starts);
+            let (context_line, context_col) =
+                frontmatter_key_line_col(&parts, "context", &line_starts);
             // AS-002: Missing name field
             if config.is_rule_enabled("AS-002") && frontmatter.name.is_none() {
                 diagnostics.push(
                     Diagnostic::error(
                         path.to_path_buf(),
-                        1,
-                        0,
+                        name_line,
+                        name_col,
                         "AS-002",
                         "Skill frontmatter is missing required 'name' field".to_string(),
                     )
@@ -104,8 +131,8 @@ impl Validator for SkillValidator {
                 diagnostics.push(
                     Diagnostic::error(
                         path.to_path_buf(),
-                        1,
-                        0,
+                        description_line,
+                        description_col,
                         "AS-003",
                         "Skill frontmatter is missing required 'description' field".to_string(),
                     )
@@ -122,16 +149,16 @@ impl Validator for SkillValidator {
                 if config.is_rule_enabled("AS-004") {
                     let name_re = NAME_FORMAT_REGEX
                         .get_or_init(|| Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").unwrap());
-                    if name.len() > 64 || !name_re.is_match(name) {
+                    if name_trimmed.len() > 64 || !name_re.is_match(name_trimmed) {
                         diagnostics.push(
                             Diagnostic::error(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                name_line,
+                                name_col,
                                 "AS-004",
                                 format!(
                                     "Name '{}' must be 1-64 characters of lowercase letters, digits, and hyphens",
-                                    name
+                                    name_trimmed
                                 ),
                             )
                             .with_suggestion(
@@ -143,15 +170,18 @@ impl Validator for SkillValidator {
 
                 // AS-005: Name cannot start or end with hyphen
                 if config.is_rule_enabled("AS-005")
-                    && (name.starts_with('-') || name.ends_with('-'))
+                    && (name_trimmed.starts_with('-') || name_trimmed.ends_with('-'))
                 {
                     diagnostics.push(
                         Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            name_line,
+                            name_col,
                             "AS-005",
-                            format!("Name '{}' cannot start or end with hyphen", name),
+                            format!(
+                                "Name '{}' cannot start or end with hyphen",
+                                name_trimmed
+                            ),
                         )
                         .with_suggestion(
                             "Remove leading/trailing hyphens from the name".to_string(),
@@ -160,14 +190,17 @@ impl Validator for SkillValidator {
                 }
 
                 // AS-006: Name cannot contain consecutive hyphens
-                if config.is_rule_enabled("AS-006") && name.contains("--") {
+                if config.is_rule_enabled("AS-006") && name_trimmed.contains("--") {
                     diagnostics.push(
                         Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            name_line,
+                            name_col,
                             "AS-006",
-                            format!("Name '{}' cannot contain consecutive hyphens", name),
+                            format!(
+                                "Name '{}' cannot contain consecutive hyphens",
+                                name_trimmed
+                            ),
                         )
                         .with_suggestion("Replace '--' with '-' in the name".to_string()),
                     );
@@ -180,8 +213,8 @@ impl Validator for SkillValidator {
                         diagnostics.push(
                             Diagnostic::error(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                name_line,
+                                name_col,
                                 "AS-007",
                                 format!("Name '{}' is reserved and cannot be used", name_trimmed),
                             )
@@ -201,8 +234,8 @@ impl Validator for SkillValidator {
                         diagnostics.push(
                             Diagnostic::error(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                description_line,
+                                description_col,
                                 "AS-008",
                                 format!("Description must be 1-1024 characters, got {}", len),
                             )
@@ -221,8 +254,8 @@ impl Validator for SkillValidator {
                         diagnostics.push(
                             Diagnostic::error(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                description_line,
+                                description_col,
                                 "AS-009",
                                 "Description must not contain XML tags".to_string(),
                             )
@@ -238,8 +271,8 @@ impl Validator for SkillValidator {
                         diagnostics.push(
                             Diagnostic::warning(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                description_line,
+                                description_col,
                                 "AS-010",
                                 "Description should include a 'Use when...' trigger phrase"
                                     .to_string(),
@@ -260,8 +293,8 @@ impl Validator for SkillValidator {
                         diagnostics.push(
                             Diagnostic::error(
                                 path.to_path_buf(),
-                                1,
-                                0,
+                                compat_line,
+                                compat_col,
                                 "AS-011",
                                 format!("Compatibility must be 1-500 characters, got {}", len),
                             )
@@ -299,8 +332,8 @@ impl Validator for SkillValidator {
                     if let Err(error) = schema.validate_model() {
                         diagnostics.push(Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            model_line,
+                            model_col,
                             "skill::schema",
                             error,
                         ));
@@ -309,8 +342,8 @@ impl Validator for SkillValidator {
                     if let Err(error) = schema.validate_context() {
                         diagnostics.push(Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            context_line,
+                            context_col,
                             "skill::schema",
                             error,
                         ));
@@ -327,8 +360,8 @@ impl Validator for SkillValidator {
                             diagnostics.push(
                                 Diagnostic::error(
                                     path.to_path_buf(),
-                                    1,
-                                    0,
+                                    name_line,
+                                    name_col,
                                     "CC-SK-006",
                                     format!(
                                         "Dangerous skill '{}' must set 'disable-model-invocation: true' to prevent accidental invocation",
@@ -352,8 +385,8 @@ impl Validator for SkillValidator {
                                     diagnostics.push(
                                         Diagnostic::warning(
                                             path.to_path_buf(),
-                                            1,
-                                            0,
+                                            allowed_tools_line,
+                                            allowed_tools_col,
                                             "CC-SK-007",
                                             "Unrestricted Bash access detected. Consider using scoped version for better security.".to_string(),
                                         )
@@ -369,13 +402,13 @@ impl Validator for SkillValidator {
 
         // AS-012: Content exceeds 500 lines
         if config.is_rule_enabled("AS-012") {
-            let line_count = parts.body.lines().count();
+            let line_count = body_raw.lines().count();
             if line_count > 500 {
                 diagnostics.push(
                     Diagnostic::warning(
                         path.to_path_buf(),
-                        1,
-                        0,
+                        body_line,
+                        body_col,
                         "AS-012",
                         format!(
                             "Skill content exceeds 500 lines (got {})",
@@ -389,16 +422,21 @@ impl Validator for SkillValidator {
 
         // AS-013: File reference too deep
         if config.is_rule_enabled("AS-013") {
-            let paths = extract_reference_paths(&parts.body);
+            let paths = extract_reference_paths(body_raw);
             for ref_path in paths {
-                if reference_path_too_deep(&ref_path) {
+                if reference_path_too_deep(&ref_path.path) {
+                    let (line, col) =
+                        line_col_at(parts.body_start + ref_path.start, &line_starts);
                     diagnostics.push(
                         Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            line,
+                            col,
                             "AS-013",
-                            format!("File reference '{}' is deeper than one level", ref_path),
+                            format!(
+                                "File reference '{}' is deeper than one level",
+                                ref_path.path
+                            ),
                         )
                         .with_suggestion("Flatten the references/ directory structure".to_string()),
                     );
@@ -408,17 +446,19 @@ impl Validator for SkillValidator {
 
         // AS-014: Windows path separator
         if config.is_rule_enabled("AS-014") {
-            let paths = extract_windows_paths(&parts.body);
+            let paths = extract_windows_paths(body_raw);
             for win_path in paths {
+                let (line, col) =
+                    line_col_at(parts.body_start + win_path.start, &line_starts);
                 diagnostics.push(
                     Diagnostic::error(
                         path.to_path_buf(),
-                        1,
-                        0,
+                        line,
+                        col,
                         "AS-014",
                         format!(
                             "Windows path separator detected in '{}'; use forward slashes",
-                            win_path
+                            win_path.path
                         ),
                     )
                     .with_suggestion("Replace '\\\\' with '/' in file paths".to_string()),
@@ -435,8 +475,8 @@ impl Validator for SkillValidator {
                     diagnostics.push(
                         Diagnostic::error(
                             path.to_path_buf(),
-                            1,
-                            0,
+                            frontmatter_line,
+                            frontmatter_col,
                             "AS-015",
                             format!(
                                 "Skill directory exceeds 8MB ({} bytes)",
@@ -456,37 +496,6 @@ impl Validator for SkillValidator {
     }
 }
 
-fn split_frontmatter(content: &str) -> FrontmatterParts {
-    let trimmed = content.trim_start();
-    if !trimmed.starts_with("---") {
-        return FrontmatterParts {
-            has_frontmatter: false,
-            has_closing: false,
-            frontmatter: String::new(),
-            body: trimmed.to_string(),
-        };
-    }
-
-    let rest = &trimmed[3..];
-    if let Some(end_pos) = rest.find("\n---") {
-        let frontmatter = &rest[..end_pos];
-        let body = &rest[end_pos + 4..];
-        FrontmatterParts {
-            has_frontmatter: true,
-            has_closing: true,
-            frontmatter: frontmatter.to_string(),
-            body: body.trim_start().to_string(),
-        }
-    } else {
-        FrontmatterParts {
-            has_frontmatter: true,
-            has_closing: false,
-            frontmatter: String::new(),
-            body: rest.to_string(),
-        }
-    }
-}
-
 fn parse_frontmatter_fields(frontmatter: &str) -> Result<SkillFrontmatter, serde_yaml::Error> {
     if frontmatter.trim().is_empty() {
         return Ok(SkillFrontmatter::default());
@@ -494,32 +503,54 @@ fn parse_frontmatter_fields(frontmatter: &str) -> Result<SkillFrontmatter, serde
     serde_yaml::from_str(frontmatter)
 }
 
-fn extract_reference_paths(body: &str) -> Vec<String> {
+fn extract_reference_paths(body: &str) -> Vec<PathMatch> {
     let re = REFERENCE_PATH_REGEX.get_or_init(|| {
         Regex::new("(?i)\\b(?:references?|refs)[/\\\\][^\\s)\\]}>\"']+").unwrap()
     });
-    let mut paths = HashSet::new();
+    let mut paths = Vec::new();
+    let mut seen = HashSet::new();
     for m in re.find_iter(body) {
-        let trimmed = trim_path_token(m.as_str());
-        if !trimmed.is_empty() {
-            paths.insert(trimmed.to_string());
+        if let Some((trimmed, delta)) = trim_path_token_with_offset(m.as_str()) {
+            if seen.insert(trimmed.clone()) {
+                paths.push(PathMatch {
+                    path: trimmed,
+                    start: m.start() + delta,
+                });
+            }
         }
     }
-    paths.into_iter().collect()
+    paths
 }
 
-fn extract_windows_paths(body: &str) -> Vec<String> {
+fn extract_windows_paths(body: &str) -> Vec<PathMatch> {
     let re = WINDOWS_PATH_REGEX.get_or_init(|| {
         Regex::new(r"(?i)\b(?:[a-z]:)?[a-z0-9._-]+(?:\\[a-z0-9._-]+)+\b").unwrap()
     });
-    let mut paths = HashSet::new();
+    let token_re = WINDOWS_PATH_TOKEN_REGEX
+        .get_or_init(|| Regex::new(r"[^\s]+\\[^\s]+").unwrap());
+    let mut paths = Vec::new();
+    let mut seen = HashSet::new();
     for m in re.find_iter(body) {
-        let trimmed = trim_path_token(m.as_str());
-        if !trimmed.is_empty() {
-            paths.insert(trimmed.to_string());
+        if let Some((trimmed, delta)) = trim_path_token_with_offset(m.as_str()) {
+            if seen.insert(trimmed.clone()) {
+                paths.push(PathMatch {
+                    path: trimmed,
+                    start: m.start() + delta,
+                });
+            }
         }
     }
-    paths.into_iter().collect()
+    for m in token_re.find_iter(body) {
+        if let Some((trimmed, delta)) = trim_path_token_with_offset(m.as_str()) {
+            if seen.insert(trimmed.clone()) {
+                paths.push(PathMatch {
+                    path: trimmed,
+                    start: m.start() + delta,
+                });
+            }
+        }
+    }
+    paths
 }
 
 fn reference_path_too_deep(path: &str) -> bool {
@@ -539,6 +570,70 @@ fn trim_path_token(token: &str) -> &str {
     token
         .trim_start_matches(|c: char| matches!(c, '(' | '[' | '{' | '<' | '"' | '\''))
         .trim_end_matches(|c: char| matches!(c, '.' | ',' | ';' | ':' | ')' | ']' | '}' | '>' | '"' | '\''))
+}
+
+fn trim_path_token_with_offset(token: &str) -> Option<(String, usize)> {
+    let trimmed = trim_path_token(token);
+    if trimmed.is_empty() {
+        return None;
+    }
+    let offset = token.find(trimmed).unwrap_or(0);
+    Some((trimmed.to_string(), offset))
+}
+
+fn compute_line_starts(content: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (idx, ch) in content.char_indices() {
+        if ch == '\n' {
+            starts.push(idx + 1);
+        }
+    }
+    starts
+}
+
+fn line_col_at(offset: usize, line_starts: &[usize]) -> (usize, usize) {
+    let mut low = 0usize;
+    let mut high = line_starts.len();
+    while low + 1 < high {
+        let mid = (low + high) / 2;
+        if line_starts[mid] <= offset {
+            low = mid;
+        } else {
+            high = mid;
+        }
+    }
+    let line_start = line_starts[low];
+    (low + 1, offset - line_start + 1)
+}
+
+fn frontmatter_key_line_col(
+    parts: &FrontmatterParts,
+    key: &str,
+    line_starts: &[usize],
+) -> (usize, usize) {
+    let offset = frontmatter_key_offset(&parts.frontmatter, key)
+        .map(|local| parts.frontmatter_start + local)
+        .unwrap_or(parts.frontmatter_start);
+    line_col_at(offset, line_starts)
+}
+
+fn frontmatter_key_offset(frontmatter: &str, key: &str) -> Option<usize> {
+    let mut offset = 0usize;
+    for line in frontmatter.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            offset += line.len() + 1;
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix(key) {
+            if rest.trim_start().starts_with(':') {
+                let column = line.len() - trimmed.len();
+                return Some(offset + column);
+            }
+        }
+        offset += line.len() + 1;
+    }
+    None
 }
 
 fn directory_size(path: &Path) -> u64 {
