@@ -2,7 +2,57 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 
 fn agnix() -> Command {
-    assert_cmd::cargo::cargo_bin_cmd!("agnix")
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("agnix");
+    cmd.current_dir(workspace_root());
+    cmd
+}
+
+fn workspace_root() -> &'static std::path::Path {
+    use std::sync::OnceLock;
+
+    static ROOT: OnceLock<std::path::PathBuf> = OnceLock::new();
+    ROOT.get_or_init(|| {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        for ancestor in manifest_dir.ancestors() {
+            let cargo_toml = ancestor.join("Cargo.toml");
+            if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+                if content.contains("[workspace]") || content.contains("[workspace.") {
+                    return ancestor.to_path_buf();
+                }
+            }
+        }
+        panic!(
+            "Failed to locate workspace root from CARGO_MANIFEST_DIR={}",
+            manifest_dir.display()
+        );
+    })
+    .as_path()
+}
+
+fn workspace_path(relative: &str) -> std::path::PathBuf {
+    workspace_root().join(relative)
+}
+
+fn fixtures_config() -> tempfile::NamedTempFile {
+    use std::io::Write;
+
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    file.write_all(
+        br#"severity = "Error"
+target = "Generic"
+exclude = [
+  "node_modules/**",
+  ".git/**",
+  "target/**",
+]
+
+[rules]
+"#,
+    )
+    .unwrap();
+    file.flush().unwrap();
+
+    file
 }
 
 #[test]
@@ -410,4 +460,93 @@ fn test_format_json_forward_slashes_in_paths() {
             file
         );
     }
+}
+
+#[test]
+fn test_cli_covers_hook_fixtures_via_cli_validation() {
+    let config = fixtures_config();
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/invalid/hooks/missing-command-field")
+        .arg("--format")
+        .arg("json")
+        .arg("--config")
+        .arg(config.path())
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "Invalid hooks fixture should exit non-zero"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+    let has_cchk006 = diagnostics.iter().any(|d| {
+        d["rule"].as_str() == Some("CC-HK-006")
+            && d["file"]
+                .as_str()
+                .map(|file| file.ends_with("missing-command-field/settings.json"))
+                .unwrap_or(false)
+    });
+    assert!(
+        has_cchk006,
+        "Expected CC-HK-006 for missing-command-field settings.json, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_fixtures_have_no_empty_placeholder_dirs() {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    fn check_dir(dir: &Path, empty_dirs: &mut Vec<PathBuf>) -> bool {
+        let mut has_file = false;
+        let entries = fs::read_dir(dir).unwrap_or_else(|e| {
+            panic!("Failed to read fixture directory {}: {}", dir.display(), e)
+        });
+
+        for entry in entries {
+            let entry = entry
+                .unwrap_or_else(|e| panic!("Failed to read entry under {}: {}", dir.display(), e));
+            let path = entry.path();
+            if path.is_file() {
+                has_file = true;
+                continue;
+            }
+            if path.is_dir() && check_dir(&path, empty_dirs) {
+                has_file = true;
+            }
+        }
+
+        if !has_file {
+            empty_dirs.push(dir.to_path_buf());
+        }
+
+        has_file
+    }
+
+    let root = workspace_path("tests/fixtures");
+    assert!(
+        root.is_dir(),
+        "Expected fixtures directory at {}",
+        root.display()
+    );
+
+    let mut empty_dirs = Vec::new();
+    check_dir(&root, &mut empty_dirs);
+
+    assert!(
+        empty_dirs.is_empty(),
+        "Empty fixture directories found:\n{}",
+        empty_dirs
+            .iter()
+            .map(|p| p.display().to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
 }
