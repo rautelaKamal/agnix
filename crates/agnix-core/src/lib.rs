@@ -108,6 +108,7 @@ impl ValidatorRegistry {
             (FileType::ClaudeMd, agents_md_validator),
             (FileType::ClaudeMd, xml_validator),
             (FileType::ClaudeMd, imports_validator),
+            (FileType::ClaudeMd, prompt_validator),
             (FileType::Agent, agent_validator),
             (FileType::Agent, xml_validator),
             (FileType::Hooks, hooks_validator),
@@ -174,10 +175,13 @@ fn cross_platform_validator() -> Box<dyn Validator> {
     Box::new(rules::cross_platform::CrossPlatformValidator)
 }
 
+fn prompt_validator() -> Box<dyn Validator> {
+    Box::new(rules::prompt::PromptValidator)
+}
+
 fn copilot_validator() -> Box<dyn Validator> {
     Box::new(rules::copilot::CopilotValidator)
 }
-
 /// Detect file type based on path patterns
 pub fn detect_file_type(path: &Path) -> FileType {
     let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -509,7 +513,7 @@ mod tests {
     fn test_validators_for_claude_md() {
         let registry = ValidatorRegistry::with_defaults();
         let validators = registry.validators_for(FileType::ClaudeMd);
-        assert_eq!(validators.len(), 5);
+        assert_eq!(validators.len(), 6);
     }
 
     #[test]
@@ -1687,6 +1691,52 @@ Use idiomatic Rust patterns.
             diagnostics.iter().any(|d| d.rule == "COP-002"),
             "validate_project should find COP-002 in copilot-invalid fixtures. Found rules: {:?}",
             diagnostics.iter().map(|d| &d.rule).collect::<Vec<_>>()
+        );
+    }
+
+    // ===== PE Rules Dispatch Integration Tests =====
+
+    #[test]
+    fn test_pe_rules_dispatched() {
+        // Verify PE-* rules are dispatched when validating ClaudeMd file type.
+        // Per SPEC.md, PE rules apply to CLAUDE.md and AGENTS.md only (not SKILL.md).
+        let fixtures_dir = get_fixtures_dir().join("prompt");
+        let config = LintConfig::default();
+        let registry = ValidatorRegistry::with_defaults();
+        let temp = tempfile::TempDir::new().unwrap();
+        let claude_path = temp.path().join("CLAUDE.md");
+
+        // Test cases: (fixture_file, expected_rule)
+        let test_cases = [
+            ("pe-001-critical-in-middle.md", "PE-001"),
+            ("pe-002-cot-on-simple.md", "PE-002"),
+            ("pe-003-weak-language.md", "PE-003"),
+            ("pe-004-ambiguous.md", "PE-004"),
+        ];
+
+        for (fixture, expected_rule) in test_cases {
+            let content = std::fs::read_to_string(fixtures_dir.join(fixture))
+                .unwrap_or_else(|_| panic!("Failed to read fixture: {}", fixture));
+            std::fs::write(&claude_path, &content).unwrap();
+            let diagnostics =
+                validate_file_with_registry(&claude_path, &config, &registry).unwrap();
+            assert!(
+                diagnostics.iter().any(|d| d.rule == expected_rule),
+                "Expected {} from {} content",
+                expected_rule,
+                fixture
+            );
+        }
+
+        // Also verify PE rules dispatch on AGENTS.md file type
+        let agents_path = temp.path().join("AGENTS.md");
+        let pe_003_content =
+            std::fs::read_to_string(fixtures_dir.join("pe-003-weak-language.md")).unwrap();
+        std::fs::write(&agents_path, &pe_003_content).unwrap();
+        let diagnostics = validate_file_with_registry(&agents_path, &config, &registry).unwrap();
+        assert!(
+            diagnostics.iter().any(|d| d.rule == "PE-003"),
+            "Expected PE-003 from AGENTS.md with weak language content"
         );
     }
 }
