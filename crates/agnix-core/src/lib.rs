@@ -1094,8 +1094,12 @@ allowed-tools: Read Write
             "Should detect both AGENTS.md files, got {:?}",
             agm_006
         );
-        assert!(agm_006.iter().any(|d| d.file.to_string_lossy().contains("subdir")));
-        assert!(agm_006.iter().any(|d| d.message.contains("Nested AGENTS.md")));
+        assert!(agm_006
+            .iter()
+            .any(|d| d.file.to_string_lossy().contains("subdir")));
+        assert!(agm_006
+            .iter()
+            .any(|d| d.message.contains("Nested AGENTS.md")));
         assert!(agm_006
             .iter()
             .any(|d| d.message.contains("Multiple AGENTS.md files")));

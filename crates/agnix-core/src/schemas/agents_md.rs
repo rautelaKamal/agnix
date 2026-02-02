@@ -408,7 +408,10 @@ pub fn find_nested_agents_md(paths: &[std::path::PathBuf]) -> Vec<NestedAgentsMd
         let depth = path.components().count();
         let path_buf = path.to_path_buf();
         if seen.insert(path_buf.clone()) {
-            results.push(NestedAgentsMd { path: path_buf, depth });
+            results.push(NestedAgentsMd {
+                path: path_buf,
+                depth,
+            });
         }
     }
 
@@ -708,8 +711,12 @@ agent: something
         ];
         let results = find_nested_agents_md(&paths);
         assert_eq!(results.len(), 2);
-        assert!(results.iter().any(|r| r.path.to_string_lossy().contains("project/AGENTS.md")));
-        assert!(results.iter().any(|r| r.path.to_string_lossy().contains("subdir")));
+        assert!(results
+            .iter()
+            .any(|r| r.path.to_string_lossy().contains("project/AGENTS.md")));
+        assert!(results
+            .iter()
+            .any(|r| r.path.to_string_lossy().contains("subdir")));
     }
 
     #[test]
@@ -756,8 +763,12 @@ agent: something
             .map(|r| r.path.to_string_lossy().to_string())
             .collect();
         assert!(result_paths.iter().any(|p| p.contains("project/AGENTS.md")));
-        assert!(result_paths.iter().any(|p| p.contains("project/a/AGENTS.md")));
-        assert!(result_paths.iter().any(|p| p.contains("project/a/b/AGENTS.md")));
+        assert!(result_paths
+            .iter()
+            .any(|p| p.contains("project/a/AGENTS.md")));
+        assert!(result_paths
+            .iter()
+            .any(|p| p.contains("project/a/b/AGENTS.md")));
     }
 
     #[test]
