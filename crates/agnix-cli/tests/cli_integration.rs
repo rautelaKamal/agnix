@@ -55,6 +55,61 @@ exclude = [
     file
 }
 
+// Helper function to check JSON output contains rules from a specific family
+fn check_json_rule_family(fixture: &str, prefixes: &[&str], family_name: &str) {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(fixture)
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+
+    let has_rule = diagnostics.iter().any(|d| {
+        let rule = d["rule"].as_str().unwrap_or("");
+        prefixes.iter().any(|p| rule.starts_with(p))
+    });
+
+    assert!(
+        has_rule,
+        "Expected at least one {} rule ({}) in diagnostics, got: {}",
+        family_name,
+        prefixes.join(" or "),
+        stdout
+    );
+}
+
+// Helper function to check SARIF output contains rules from a specific family
+fn check_sarif_rule_family(fixture: &str, prefixes: &[&str], family_name: &str) {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(fixture)
+        .arg("--format")
+        .arg("sarif")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let results = json["runs"][0]["results"].as_array().unwrap();
+
+    let has_rule = results.iter().any(|r| {
+        let rule_id = r["ruleId"].as_str().unwrap_or("");
+        prefixes.iter().any(|p| rule_id.starts_with(p))
+    });
+
+    assert!(
+        has_rule,
+        "SARIF results should include {} diagnostics ({})",
+        family_name,
+        prefixes.join(" or ")
+    );
+}
+
 #[test]
 fn test_format_sarif_produces_valid_json() {
     let mut cmd = agnix();
@@ -525,6 +580,547 @@ fn test_cli_covers_hook_fixtures_via_cli_validation() {
     assert!(
         has_cchk006,
         "Expected CC-HK-006 for missing-command-field settings.json, got: {}",
+        stdout
+    );
+}
+
+// ============================================================================
+// JSON Output Rule Family Coverage Tests
+// ============================================================================
+
+#[test]
+fn test_format_json_contains_skill_rules() {
+    check_json_rule_family("tests/fixtures/invalid/skills", &["AS-", "CC-SK-"], "skill");
+}
+
+#[test]
+fn test_format_json_contains_hook_rules() {
+    check_json_rule_family("tests/fixtures/invalid/hooks", &["CC-HK-"], "hook");
+}
+
+#[test]
+fn test_format_json_contains_agent_rules() {
+    check_json_rule_family("tests/fixtures/invalid/agents", &["CC-AG-"], "agent");
+}
+
+#[test]
+fn test_format_json_contains_mcp_rules() {
+    check_json_rule_family("tests/fixtures/mcp", &["MCP-"], "MCP");
+}
+
+#[test]
+fn test_format_json_contains_xml_rules() {
+    check_json_rule_family("tests/fixtures/xml", &["XML-"], "XML");
+}
+
+#[test]
+fn test_format_json_contains_plugin_rules() {
+    check_json_rule_family("tests/fixtures/invalid/plugins", &["CC-PL-"], "plugin");
+}
+
+#[test]
+fn test_format_json_contains_copilot_rules() {
+    check_json_rule_family("tests/fixtures/copilot-invalid", &["COP-"], "Copilot");
+}
+
+#[test]
+fn test_format_json_contains_agents_md_rules() {
+    check_json_rule_family("tests/fixtures/agents_md", &["AGM-"], "AGENTS.md");
+}
+
+#[test]
+fn test_format_json_contains_memory_rules() {
+    use std::fs;
+    use std::io::Write;
+
+    // CC-MEM rules require specific content patterns to trigger
+    // Create a fixture with generic instructions (CC-MEM-005)
+    let temp_dir = tempfile::tempdir().unwrap();
+    let claude_md = temp_dir.path().join("CLAUDE.md");
+    let mut file = fs::File::create(&claude_md).unwrap();
+    writeln!(
+        file,
+        "# Project Memory\n\nBe helpful and concise. Always follow best practices."
+    )
+    .unwrap();
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+
+    let has_memory_rule = diagnostics
+        .iter()
+        .any(|d| d["rule"].as_str().unwrap_or("").starts_with("CC-MEM-"));
+
+    assert!(
+        has_memory_rule,
+        "Expected at least one memory rule (CC-MEM-*) in diagnostics, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_format_json_contains_ref_rules() {
+    check_json_rule_family("tests/fixtures/refs", &["REF-"], "reference");
+}
+
+#[test]
+fn test_format_json_contains_cross_platform_rules() {
+    check_json_rule_family("tests/fixtures/cross_platform", &["XP-"], "cross-platform");
+}
+
+// ============================================================================
+// SARIF Output Completeness Tests
+// ============================================================================
+
+#[test]
+fn test_format_sarif_results_include_skill_diagnostics() {
+    check_sarif_rule_family("tests/fixtures/invalid/skills", &["AS-", "CC-SK-"], "skill");
+}
+
+#[test]
+fn test_format_sarif_results_include_hook_diagnostics() {
+    check_sarif_rule_family("tests/fixtures/invalid/hooks", &["CC-HK-"], "hook");
+}
+
+#[test]
+fn test_format_sarif_results_include_mcp_diagnostics() {
+    check_sarif_rule_family("tests/fixtures/mcp", &["MCP-"], "MCP");
+}
+
+#[test]
+fn test_format_sarif_results_include_memory_diagnostics() {
+    use std::fs;
+    use std::io::Write;
+
+    // CC-MEM rules require specific content patterns to trigger
+    // Create a fixture with generic instructions (CC-MEM-005)
+    let temp_dir = tempfile::tempdir().unwrap();
+    let claude_md = temp_dir.path().join("CLAUDE.md");
+    let mut file = fs::File::create(&claude_md).unwrap();
+    writeln!(
+        file,
+        "# Project Memory\n\nBe helpful and concise. Always follow best practices."
+    )
+    .unwrap();
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("sarif")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let results = json["runs"][0]["results"].as_array().unwrap();
+
+    let has_memory_result = results
+        .iter()
+        .any(|r| r["ruleId"].as_str().unwrap_or("").starts_with("CC-MEM-"));
+
+    assert!(
+        has_memory_result,
+        "SARIF results should include memory diagnostics (CC-MEM-*)"
+    );
+}
+
+#[test]
+fn test_format_sarif_location_fields() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/invalid/skills")
+        .arg("--format")
+        .arg("sarif")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let results = json["runs"][0]["results"].as_array().unwrap();
+
+    assert!(!results.is_empty(), "Should have at least one result");
+
+    for result in results {
+        let locations = result["locations"].as_array();
+        assert!(
+            locations.is_some(),
+            "Each result should have locations array"
+        );
+
+        if let Some(locs) = locations {
+            assert!(!locs.is_empty(), "Result should have at least one location");
+            let physical = &locs[0]["physicalLocation"];
+            assert!(
+                physical["artifactLocation"]["uri"].is_string(),
+                "Should have artifactLocation.uri"
+            );
+            assert!(
+                physical["region"]["startLine"].is_number(),
+                "Should have region.startLine"
+            );
+            assert!(
+                physical["region"]["startColumn"].is_number(),
+                "Should have region.startColumn"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_format_sarif_rules_have_help_uri() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/valid")
+        .arg("--format")
+        .arg("sarif")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let rules = json["runs"][0]["tool"]["driver"]["rules"]
+        .as_array()
+        .unwrap();
+
+    for rule in rules {
+        let help_uri = rule["helpUri"].as_str();
+        assert!(
+            help_uri.is_some(),
+            "Rule {} should have helpUri",
+            rule["id"]
+        );
+        assert!(
+            help_uri.unwrap().contains("VALIDATION-RULES.md"),
+            "helpUri should reference VALIDATION-RULES.md"
+        );
+    }
+}
+
+// ============================================================================
+// Text Output Formatting Tests
+// ============================================================================
+
+#[test]
+fn test_format_text_shows_file_location() {
+    let mut cmd = agnix();
+    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_match(r"[^:]+:\d+:\d+").unwrap());
+}
+
+#[test]
+fn test_format_text_shows_error_level() {
+    let mut cmd = agnix();
+    // Match diagnostic line format: file:line:col error: message
+    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_match(r":\d+:\d+.*error").unwrap());
+}
+
+#[test]
+fn test_format_text_shows_warning_level() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let mut file = fs::File::create(&skill_path).unwrap();
+    // Valid skill name but missing trigger phrase (AS-010 warning)
+    writeln!(
+        file,
+        "---\nname: test-skill\ndescription: A test skill\n---\nContent"
+    )
+    .unwrap();
+
+    let mut cmd = agnix();
+    // Match diagnostic line format: file:line:col warning: message
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .assert()
+        .success()
+        .stdout(predicate::str::is_match(r":\d+:\d+.*warning").unwrap());
+}
+
+#[test]
+fn test_format_text_shows_summary() {
+    let mut cmd = agnix();
+    cmd.arg("tests/fixtures/invalid/skills")
+        .assert()
+        .failure()
+        .stdout(predicate::str::contains("Found"));
+}
+
+#[test]
+fn test_format_text_verbose_shows_rule() {
+    let mut cmd = agnix();
+    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("--verbose")
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_match(r"(AS|CC)-\w+-\d+").unwrap());
+}
+
+#[test]
+fn test_format_text_verbose_shows_suggestion() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("--verbose")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Verbose mode should show additional help/suggestion info
+    assert!(
+        stdout.contains("help") || stdout.contains("suggestion") || stdout.contains("-->"),
+        "Verbose output should contain help or suggestion info, got: {}",
+        stdout
+    );
+}
+
+// ============================================================================
+// Fix and Dry-Run Tests
+// ============================================================================
+
+#[test]
+fn test_dry_run_no_file_modification() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("bad-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let original_content = "---\nname: Bad-Skill\ndescription: test\n---\nContent";
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        write!(file, "{}", original_content).unwrap();
+    }
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+
+    // Verify file was not modified
+    let content_after = fs::read_to_string(&skill_path).unwrap();
+    assert_eq!(
+        content_after, original_content,
+        "File should not be modified with --dry-run"
+    );
+
+    // Verify the flag was recognized (not just silently ignored)
+    // CLI should still produce diagnostic output
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.is_empty() || !output.status.success(),
+        "--dry-run flag should be recognized and produce output or error"
+    );
+}
+
+#[test]
+fn test_fix_exit_code_on_remaining_errors() {
+    let mut cmd = agnix();
+    // Invalid fixtures have errors that cannot be auto-fixed
+    let output = cmd
+        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("--fix")
+        .output()
+        .unwrap();
+
+    // Should still exit with error since errors remain
+    assert!(
+        !output.status.success(),
+        "Should exit with error code when non-fixable errors remain"
+    );
+
+    // Verify the flag was recognized (produces diagnostic output, not clap error)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stdout.is_empty() || stderr.is_empty(),
+        "--fix flag should be recognized and run fix mode, got stderr: {}",
+        stderr
+    );
+}
+
+#[test]
+fn test_fix_safe_exit_code() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("--fix-safe")
+        .output()
+        .unwrap();
+
+    // Should still exit with error since errors remain
+    assert!(
+        !output.status.success(),
+        "Should exit with error code when errors remain after --fix-safe"
+    );
+
+    // Verify the flag was recognized (produces diagnostic output, not clap error)
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stdout.is_empty() || stderr.is_empty(),
+        "--fix-safe flag should be recognized and run fix mode, got stderr: {}",
+        stderr
+    );
+}
+
+// ============================================================================
+// Flag Combination Tests
+// ============================================================================
+
+#[test]
+fn test_strict_with_sarif_format() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let mut file = fs::File::create(&skill_path).unwrap();
+    // Valid skill name but missing trigger phrase (AS-010 warning)
+    writeln!(
+        file,
+        "---\nname: test-skill\ndescription: A test skill\n---\nContent"
+    )
+    .unwrap();
+
+    // With --strict, warnings should cause exit code 1
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("sarif")
+        .arg("--strict")
+        .output()
+        .unwrap();
+
+    // Verify it's valid SARIF
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert!(json["runs"].is_array(), "Should produce valid SARIF");
+
+    // Should fail due to warnings in strict mode
+    assert!(
+        !output.status.success(),
+        "With --strict and warnings, should exit with error code"
+    );
+}
+
+#[test]
+fn test_verbose_with_json_ignored() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/valid")
+        .arg("--verbose")
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should still be valid JSON (verbose doesn't corrupt JSON output)
+    let json: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+    assert!(
+        json.is_ok(),
+        "--verbose should not corrupt JSON output, got: {}",
+        stdout
+    );
+}
+
+#[test]
+fn test_target_cursor_disables_cc_rules() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("deploy-prod");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let mut file = fs::File::create(&skill_path).unwrap();
+    // This would normally trigger CC-SK-006 (Claude-specific rule)
+    writeln!(
+        file,
+        "---\nname: deploy-prod\ndescription: Deploy to production\n---\nDeploy the application"
+    )
+    .unwrap();
+
+    // With --target cursor, CC-* rules should be disabled
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("json")
+        .arg("--target")
+        .arg("cursor")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let diagnostics = json["diagnostics"].as_array().unwrap();
+
+    // Should not have any CC-* rules for cursor target
+    let has_cc_rule = diagnostics
+        .iter()
+        .any(|d| d["rule"].as_str().unwrap_or("").starts_with("CC-"));
+
+    assert!(
+        !has_cc_rule,
+        "With --target cursor, CC-* rules should be disabled"
+    );
+}
+
+#[test]
+fn test_validate_subcommand() {
+    let mut cmd = agnix();
+    cmd.arg("validate")
+        .arg("tests/fixtures/valid")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_dry_run_with_format_json() {
+    let mut cmd = agnix();
+    let output = cmd
+        .arg("tests/fixtures/invalid/skills")
+        .arg("--dry-run")
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // Should still produce valid JSON
+    let json: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+    assert!(
+        json.is_ok(),
+        "--dry-run --format json should produce valid JSON, got: {}",
         stdout
     );
 }
