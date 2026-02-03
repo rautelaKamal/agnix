@@ -34,6 +34,10 @@ inputs:
     description: 'agnix version to use (default: latest)'
     required: false
     default: 'latest'
+  build-from-source:
+    description: 'Build from source instead of downloading release (requires Rust)'
+    required: false
+    default: 'false'
 
 outputs:
   result:
@@ -57,6 +61,7 @@ runs:
       run: ${{ github.action_path }}/scripts/download.sh
       env:
         AGNIX_VERSION: ${{ inputs.version }}
+        BUILD_FROM_SOURCE: ${{ inputs.build-from-source }}
 
     - name: Run agnix
       id: agnix

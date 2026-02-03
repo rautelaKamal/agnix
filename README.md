@@ -213,6 +213,7 @@ Use the official agnix GitHub Action for seamless CI/CD integration:
 | `format` | Output format (text, json, sarif) | `text` |
 | `verbose` | Verbose output | `false` |
 | `version` | agnix version to use | `latest` |
+| `build-from-source` | Build from source instead of downloading (requires Rust) | `false` |
 
 ### Action Outputs
 
