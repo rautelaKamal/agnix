@@ -174,6 +174,31 @@ pub enum LintError {
         source: std::io::Error,
     },
 
+    #[error("Refusing to read symlink: {path}")]
+    #[diagnostic(
+        code(agnix::file_symlink),
+        help("Symlinks are not supported for security reasons")
+    )]
+    FileSymlink { path: PathBuf },
+
+    #[error("File too large: {path} ({size} bytes, limit {limit} bytes)")]
+    #[diagnostic(
+        code(agnix::file_too_big),
+        help("Files larger than the configured size limit are not supported")
+    )]
+    FileTooBig {
+        path: PathBuf,
+        size: u64,
+        limit: u64,
+    },
+
+    #[error("Not a regular file: {path}")]
+    #[diagnostic(
+        code(agnix::file_not_regular),
+        help("Only regular files are supported (not directories, FIFOs, or device nodes)")
+    )]
+    FileNotRegular { path: PathBuf },
+
     #[error("Failed to parse YAML frontmatter")]
     #[diagnostic(code(agnix::yaml_parse), help("Check YAML syntax between --- markers"))]
     YamlParse {
