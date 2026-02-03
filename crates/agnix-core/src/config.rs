@@ -18,6 +18,10 @@ pub struct LintConfig {
 
     /// Target tool (claude-code, cursor, codex, generic)
     pub target: TargetTool,
+
+    /// Runtime-only validation root directory (not serialized)
+    #[serde(skip)]
+    pub root_dir: Option<PathBuf>,
 }
 
 impl Default for LintConfig {
@@ -31,6 +35,7 @@ impl Default for LintConfig {
                 "target/**".to_string(),
             ],
             target: TargetTool::Generic,
+            root_dir: None,
         }
     }
 }
@@ -175,6 +180,11 @@ impl LintConfig {
     /// Load config or use default
     pub fn load_or_default(path: Option<&PathBuf>) -> Self {
         path.and_then(|p| Self::load(p).ok()).unwrap_or_default()
+    }
+
+    /// Set the runtime validation root directory (not persisted)
+    pub fn set_root_dir(&mut self, root_dir: PathBuf) {
+        self.root_dir = Some(root_dir);
     }
 
     /// Check if a specific rule is enabled based on config

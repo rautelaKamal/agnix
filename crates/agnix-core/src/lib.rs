@@ -271,6 +271,10 @@ pub fn validate_project_with_registry(
 ) -> LintResult<Vec<Diagnostic>> {
     use ignore::WalkBuilder;
 
+    let root_dir = resolve_validation_root(path);
+    let mut config = config.clone();
+    config.set_root_dir(root_dir);
+
     // Pre-compile exclude patterns once (avoids N+1 pattern compilation)
     // Panic on invalid patterns to catch config errors early
     let exclude_patterns: Vec<glob::Pattern> = config
@@ -309,7 +313,7 @@ pub fn validate_project_with_registry(
     let mut diagnostics: Vec<Diagnostic> = paths
         .par_iter()
         .flat_map(
-            |file_path| match validate_file_with_registry(file_path, config, registry) {
+            |file_path| match validate_file_with_registry(file_path, &config, registry) {
                 Ok(file_diagnostics) => file_diagnostics,
                 Err(e) => {
                     vec![Diagnostic::error(
@@ -386,6 +390,15 @@ pub fn validate_project_with_registry(
     });
 
     Ok(diagnostics)
+}
+
+fn resolve_validation_root(path: &Path) -> PathBuf {
+    let candidate = if path.is_file() {
+        path.parent().unwrap_or(Path::new("."))
+    } else {
+        path
+    };
+    std::fs::canonicalize(candidate).unwrap_or_else(|_| candidate.to_path_buf())
 }
 
 #[cfg(test)]

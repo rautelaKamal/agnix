@@ -15,7 +15,7 @@ use crate::{
     rules::Validator,
 };
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub struct ImportsValidator;
 
@@ -55,6 +55,7 @@ impl Validator for ImportsValidator {
         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let is_claude_md = matches!(filename, "CLAUDE.md" | "CLAUDE.local.md");
 
+        let project_root = resolve_project_root(path, config);
         let root_path = normalize_existing_path(path);
         let mut cache: HashMap<PathBuf, Vec<Import>> = HashMap::new();
         let mut visited_depth: HashMap<PathBuf, usize> = HashMap::new();
@@ -70,6 +71,7 @@ impl Validator for ImportsValidator {
             &mut diagnostics,
             config,
             is_claude_md,
+            &project_root,
         );
 
         // Validate markdown links (REF-002)
@@ -89,6 +91,7 @@ fn visit_imports(
     diagnostics: &mut Vec<Diagnostic>,
     config: &LintConfig,
     root_is_claude_md: bool,
+    project_root: &Path,
 ) {
     let depth = stack.len();
     if let Some(prev_depth) = visited_depth.get(file_path) {
@@ -102,6 +105,8 @@ fn visit_imports(
     let Some(imports) = imports else { return };
 
     let base_dir = file_path.parent().unwrap_or(Path::new("."));
+    let normalized_base = normalize_existing_path(base_dir);
+    let normalized_root = normalize_existing_path(project_root);
 
     // Determine file type for current file to route its own diagnostics
     let filename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -133,7 +138,8 @@ fn visit_imports(
 
         // Validate path to prevent traversal attacks
         // Reject absolute paths and paths that escape the project root
-        if import.path.starts_with('/') || import.path.starts_with('~') {
+        let raw_path = Path::new(&import.path);
+        if raw_path.is_absolute() || import.path.starts_with('~') {
             if check_not_found {
                 diagnostics.push(
                     Diagnostic::error(
@@ -144,6 +150,25 @@ fn visit_imports(
                         format!("Absolute import paths not allowed: @{}", import.path),
                     )
                     .with_suggestion("Use relative paths only".to_string()),
+                );
+            }
+            continue;
+        }
+
+        let normalized_resolved = normalize_join(&normalized_base, &import.path);
+        if !normalized_resolved.starts_with(&normalized_root) {
+            if check_not_found {
+                diagnostics.push(
+                    Diagnostic::error(
+                        file_path.clone(),
+                        import.line,
+                        import.column,
+                        rule_not_found,
+                        format!("Import path escapes project root: @{}", import.path),
+                    )
+                    .with_suggestion(
+                        "Use relative paths that stay within the project root".to_string(),
+                    ),
                 );
             }
             continue;
@@ -222,6 +247,7 @@ fn visit_imports(
                 diagnostics,
                 config,
                 root_is_claude_md,
+                project_root,
             );
         }
     }
@@ -263,8 +289,46 @@ fn resolve_import_path(import_path: &str, base_dir: &Path) -> PathBuf {
     }
 }
 
+fn normalize_join(base_dir: &Path, import_path: &str) -> PathBuf {
+    let mut result = PathBuf::from(base_dir);
+    for component in Path::new(import_path).components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                result.pop();
+            }
+            Component::Normal(segment) => {
+                result.push(segment);
+            }
+            Component::RootDir | Component::Prefix(_) => {
+                result = PathBuf::from(component.as_os_str());
+            }
+        }
+    }
+    result
+}
+
 fn normalize_existing_path(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn resolve_project_root(path: &Path, config: &LintConfig) -> PathBuf {
+    if let Some(root) = config.root_dir.as_deref() {
+        return normalize_existing_path(root);
+    }
+
+    find_repo_root(path)
+        .unwrap_or_else(|| normalize_existing_path(path.parent().unwrap_or(Path::new("."))))
+}
+
+fn find_repo_root(path: &Path) -> Option<PathBuf> {
+    for ancestor in path.ancestors() {
+        let git_marker = ancestor.join(".git");
+        if git_marker.is_dir() || git_marker.is_file() {
+            return Some(ancestor.to_path_buf());
+        }
+    }
+    None
 }
 
 fn format_cycle(stack: &[PathBuf], target: &Path) -> String {
@@ -578,6 +642,28 @@ mod tests {
         assert!(diagnostics
             .iter()
             .any(|d| d.message.contains("Absolute import paths not allowed")));
+    }
+
+    #[test]
+    fn test_path_escape_rejection() {
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().join("root");
+        let docs = root.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(temp.path().join("outside.md"), "Outside content").unwrap();
+
+        let file_path = docs.join("CLAUDE.md");
+        fs::write(&file_path, "See @../../outside.md").unwrap();
+
+        let mut config = LintConfig::default();
+        config.root_dir = Some(root);
+
+        let validator = ImportsValidator;
+        let diagnostics = validator.validate(&file_path, "See @../../outside.md", &config);
+
+        assert!(diagnostics.iter().any(|d| {
+            d.rule == "CC-MEM-001" && d.message.contains("escapes project root")
+        }));
     }
 
     // ===== Helper Function Tests =====
