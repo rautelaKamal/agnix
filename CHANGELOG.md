@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Reusable GitHub Action for CI/CD integration:
+  - Composite action using pre-built release binaries
+  - Inputs for path, strict, target, config, format, verbose, version
+  - Outputs for result, errors, warnings, sarif-file
+  - GitHub annotations from validation diagnostics
+  - Cross-platform support (Linux, macOS, Windows)
+  - Test workflow for action validation
 - Release workflow for automated binary distribution on version tags:
   - Builds for 5 targets (linux-gnu, linux-musl, macos-x86, macos-arm, windows)
   - Creates archives with SHA256 checksums
