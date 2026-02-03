@@ -1375,6 +1375,106 @@ fn test_help_shows_target_possible_values() {
     );
 }
 
+// ============================================================================
+// JSON Output files_checked Accuracy Tests (Issue #127)
+// ============================================================================
+
+#[test]
+fn test_format_json_files_checked_counts_all_validated_files() {
+    use std::fs;
+
+    // Create a directory with valid files that produce no diagnostics
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    // Create valid SKILL.md files (no diagnostics expected)
+    let skill_dir1 = temp_dir.path().join("skills").join("code-review");
+    fs::create_dir_all(&skill_dir1).unwrap();
+    fs::write(
+        skill_dir1.join("SKILL.md"),
+        "---\nname: code-review\ndescription: Use when reviewing code\n---\nBody",
+    )
+    .unwrap();
+
+    let skill_dir2 = temp_dir.path().join("skills").join("test-runner");
+    fs::create_dir_all(&skill_dir2).unwrap();
+    fs::write(
+        skill_dir2.join("SKILL.md"),
+        "---\nname: test-runner\ndescription: Use when running tests\n---\nBody",
+    )
+    .unwrap();
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "agnix exited with non-zero status: {:?}",
+        output.status
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    let files_checked = json["files_checked"].as_u64().unwrap();
+
+    // files_checked should be exactly 2 (the two SKILL.md files we created)
+    assert_eq!(
+        files_checked, 2,
+        "Expected 2 files checked, found {}",
+        files_checked
+    );
+}
+
+#[test]
+fn test_format_json_files_checked_excludes_unknown_types() {
+    use std::fs;
+
+    // Create a directory with mixed file types
+    let temp_dir = tempfile::tempdir().unwrap();
+
+    // Create files of unknown type (should NOT be counted)
+    fs::write(temp_dir.path().join("main.rs"), "fn main() {}").unwrap();
+    fs::write(temp_dir.path().join("index.ts"), "console.log('hello')").unwrap();
+
+    // Create one recognized file (should be counted)
+    fs::write(
+        temp_dir.path().join("SKILL.md"),
+        "---\nname: code-review\ndescription: Use when reviewing code\n---\nBody",
+    )
+    .unwrap();
+
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--format")
+        .arg("json")
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "agnix exited with non-zero status: {:?}",
+        output.status
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+
+    let files_checked = json["files_checked"].as_u64().unwrap();
+
+    // Only the SKILL.md file should be counted
+    assert_eq!(
+        files_checked, 1,
+        "files_checked should only count recognized file types (SKILL.md), got {}",
+        files_checked
+    );
+}
+
 #[test]
 fn test_init_creates_config_file_with_plain_text_output() {
     let temp_dir = tempfile::tempdir().unwrap();
