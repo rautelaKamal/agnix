@@ -104,7 +104,36 @@ fn test_format_sarif_has_all_rules() {
     let rules = json["runs"][0]["tool"]["driver"]["rules"]
         .as_array()
         .unwrap();
-    assert_eq!(rules.len(), 80, "Should have all 80 validation rules");
+
+    // Use threshold range to avoid brittleness when rules are added/removed,
+    // while still catching major regressions (missing rules) or explosions.
+    // As of writing, there are 84 rules documented in VALIDATION-RULES.md.
+    assert!(
+        rules.len() >= 70,
+        "Expected at least 70 validation rules, found {} (possible rule registration bug)",
+        rules.len()
+    );
+    assert!(
+        rules.len() <= 120,
+        "Expected at most 120 validation rules, found {} (unexpected rule explosion)",
+        rules.len()
+    );
+
+    // Verify rule structure: each rule should have id and shortDescription
+    for (i, rule) in rules.iter().enumerate() {
+        assert!(
+            rule["id"].is_string(),
+            "Rule at index {} should have an 'id' field. Rule: {}",
+            i,
+            rule
+        );
+        assert!(
+            rule["shortDescription"]["text"].is_string(),
+            "Rule at index {} should have a 'shortDescription.text' field. Rule: {}",
+            i,
+            rule
+        );
+    }
 }
 
 #[test]
@@ -212,11 +241,12 @@ fn test_format_json_version_matches_cargo() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
 
-    // Version should match CARGO_PKG_VERSION
+    // Version must exactly match CARGO_PKG_VERSION (works for 0.x and 1.x+)
     let version = json["version"].as_str().unwrap();
-    assert!(
-        version.starts_with("0."),
-        "Version should match cargo version format"
+    assert_eq!(
+        version,
+        env!("CARGO_PKG_VERSION"),
+        "JSON version should match Cargo.toml version"
     );
 }
 
@@ -389,13 +419,13 @@ fn test_format_json_strict_mode_no_warnings() {
     let errors = json["summary"]["errors"].as_u64().unwrap();
     let warnings = json["summary"]["warnings"].as_u64().unwrap();
 
-    // If there are no errors and no warnings, strict mode should still succeed
-    if errors == 0 && warnings == 0 {
-        assert!(
-            output.status.success(),
-            "With --strict and no issues, should succeed"
-        );
-    }
+    // Unconditionally assert: valid/skills fixture must be clean
+    assert_eq!(errors, 0, "valid/skills fixture should have no errors");
+    assert_eq!(warnings, 0, "valid/skills fixture should have no warnings");
+    assert!(
+        output.status.success(),
+        "With --strict and no issues, should succeed"
+    );
 }
 
 #[test]
