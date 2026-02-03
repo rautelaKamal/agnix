@@ -38,6 +38,10 @@ inputs:
     description: 'Build from source instead of downloading release (requires Rust)'
     required: false
     default: 'false'
+  fail-on-error:
+    description: 'Fail the action if validation errors are found (set to false to always succeed and check result output)'
+    required: false
+    default: 'true'
 
 outputs:
   result:
@@ -76,3 +80,4 @@ runs:
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_FORMAT: ${{ inputs.format }}
         INPUT_VERBOSE: ${{ inputs.verbose }}
+        FAIL_ON_ERROR: ${{ inputs.fail-on-error }}

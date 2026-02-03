@@ -119,5 +119,11 @@ echo "agnix validation complete"
 echo "  Errors: ${ERRORS}"
 echo "  Warnings: ${WARNINGS}"
 
-# Exit with original exit code
-exit ${EXIT_CODE}
+# Exit based on FAIL_ON_ERROR setting
+# Default: true (action fails if agnix finds errors)
+# Set to false to always succeed and check 'result' output
+if [ "${FAIL_ON_ERROR:-true}" = "false" ]; then
+    exit 0
+else
+    exit ${EXIT_CODE}
+fi

@@ -36,7 +36,7 @@ jobs:
         uses: ./
         with:
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Verify outputs set and valid
         shell: bash
@@ -77,7 +77,7 @@ jobs:
         with:
           strict: 'true'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Test action (target claude-code)
         id: test-target
@@ -85,7 +85,7 @@ jobs:
         with:
           target: 'claude-code'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Test action (target cursor)
         id: test-cursor
@@ -93,7 +93,7 @@ jobs:
         with:
           target: 'cursor'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Test action (JSON output)
         id: test-json
@@ -101,7 +101,7 @@ jobs:
         with:
           format: 'json'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Verify JSON output values
         shell: bash
@@ -122,7 +122,7 @@ jobs:
         with:
           format: 'sarif'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Verify SARIF file created and valid
         shell: bash
@@ -153,7 +153,7 @@ jobs:
         with:
           verbose: 'true'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Test action (custom path)
         id: test-path
@@ -161,7 +161,7 @@ jobs:
         with:
           path: './crates'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
   test-sarif-upload:
     name: Test SARIF Upload
@@ -183,7 +183,7 @@ jobs:
         with:
           format: 'sarif'
           build-from-source: 'true'
-        continue-on-error: true
+          fail-on-error: 'false'
 
       - name: Upload SARIF to GitHub
         if: steps.agnix.outputs.sarif_file != ''
