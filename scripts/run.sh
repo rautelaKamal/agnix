@@ -93,12 +93,21 @@ fi
 if [ "${ORIGINAL_FORMAT}" = "sarif" ]; then
     SARIF_FILE="${GITHUB_WORKSPACE:-$(pwd)}/agnix-results.sarif"
 
+    # Build SARIF command arguments
+    SARIF_ARGS=("${PATH_ARG}")
+    if [ "${INPUT_STRICT:-false}" = "true" ]; then
+        SARIF_ARGS+=("--strict")
+    fi
+    if [ -n "${INPUT_TARGET:-}" ] && [ "${INPUT_TARGET}" != "generic" ]; then
+        SARIF_ARGS+=("--target" "${INPUT_TARGET}")
+    fi
+    if [ -n "${INPUT_CONFIG:-}" ]; then
+        SARIF_ARGS+=("--config" "${INPUT_CONFIG}")
+    fi
+    SARIF_ARGS+=("--format" "sarif")
+
     # Re-run with SARIF format
-    "${AGNIX}" "${PATH_ARG}" \
-        ${INPUT_STRICT:+--strict} \
-        ${INPUT_TARGET:+--target "${INPUT_TARGET}"} \
-        ${INPUT_CONFIG:+--config "${INPUT_CONFIG}"} \
-        --format sarif > "${SARIF_FILE}" 2>/dev/null || true
+    "${AGNIX}" "${SARIF_ARGS[@]}" > "${SARIF_FILE}" 2>/dev/null || true
 
     echo "sarif_file=${SARIF_FILE}" >> "${GITHUB_OUTPUT:-/dev/stdout}"
     echo "SARIF output written to ${SARIF_FILE}"
