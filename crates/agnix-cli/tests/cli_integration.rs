@@ -1522,3 +1522,201 @@ fn test_init_creates_config_file_with_plain_text_output() {
     // Verify exit code is success
     assert!(output.status.success(), "Init command should succeed");
 }
+
+// ============================================================================
+// Auto-Fix Tests for AS-004 and AS-010 (Issue #15)
+// ============================================================================
+
+#[test]
+fn test_fix_as_004_converts_name_to_kebab_case() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        // Invalid name with underscores
+        write!(
+            file,
+            "---\nname: Test_Skill_Name\ndescription: Use when testing\n---\nBody"
+        )
+        .unwrap();
+    }
+
+    // Run with --fix
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix")
+        .output()
+        .unwrap();
+
+    // Read the fixed file
+    let fixed_content = fs::read_to_string(&skill_path).unwrap();
+
+    // Should convert Test_Skill_Name to test-skill-name
+    assert!(
+        fixed_content.contains("name: test-skill-name"),
+        "AS-004 fix should convert name to kebab-case, got: {}",
+        fixed_content
+    );
+
+    // Output should indicate fixes applied
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Fixed") || stdout.contains("fix"),
+        "Output should mention fix applied"
+    );
+}
+
+#[test]
+fn test_fix_as_010_prepends_trigger_phrase() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("code-review");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        // Valid name but missing trigger phrase
+        write!(
+            file,
+            "---\nname: code-review\ndescription: Reviews code for quality\n---\nBody"
+        )
+        .unwrap();
+    }
+
+    // Run with --fix (not --fix-safe since AS-010 is not a safe fix)
+    let mut cmd = agnix();
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix")
+        .output()
+        .unwrap();
+
+    // Read the fixed file
+    let fixed_content = fs::read_to_string(&skill_path).unwrap();
+
+    // Should prepend "Use when user wants to " to description
+    assert!(
+        fixed_content.contains("Use when user wants to Reviews code for quality"),
+        "AS-010 fix should prepend trigger phrase, got: {}",
+        fixed_content
+    );
+}
+
+#[test]
+fn test_fix_safe_skips_as_010() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("code-review");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let original_content = "---\nname: code-review\ndescription: Reviews code\n---\nBody";
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        write!(file, "{}", original_content).unwrap();
+    }
+
+    // Run with --fix-safe (should NOT fix AS-010 since it's not safe)
+    let mut cmd = agnix();
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix-safe")
+        .output()
+        .unwrap();
+
+    // Read the file
+    let content_after = fs::read_to_string(&skill_path).unwrap();
+
+    // AS-010 fix is NOT safe, so it should NOT be applied
+    assert_eq!(
+        content_after, original_content,
+        "--fix-safe should not apply AS-010 fix"
+    );
+}
+
+#[test]
+fn test_fix_safe_applies_case_only_as_004() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        // Name only needs lowercase (case-only change = safe)
+        write!(
+            file,
+            "---\nname: TestSkill\ndescription: Use when testing\n---\nBody"
+        )
+        .unwrap();
+    }
+
+    // Run with --fix-safe
+    let mut cmd = agnix();
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix-safe")
+        .output()
+        .unwrap();
+
+    // Read the fixed file
+    let fixed_content = fs::read_to_string(&skill_path).unwrap();
+
+    // Case-only fix IS safe, so it should be applied
+    assert!(
+        fixed_content.contains("name: testskill"),
+        "--fix-safe should apply case-only AS-004 fix, got: {}",
+        fixed_content
+    );
+}
+
+#[test]
+fn test_dry_run_shows_as_004_fix_without_applying() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let original_content = "---\nname: Test_Skill\ndescription: Use when testing\n---\nBody";
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        write!(file, "{}", original_content).unwrap();
+    }
+
+    // Run with --dry-run
+    let mut cmd = agnix();
+    let output = cmd
+        .arg(temp_dir.path().to_str().unwrap())
+        .arg("--dry-run")
+        .output()
+        .unwrap();
+
+    // File should NOT be modified
+    let content_after = fs::read_to_string(&skill_path).unwrap();
+    assert_eq!(
+        content_after, original_content,
+        "--dry-run should not modify files"
+    );
+
+    // Output should show what would be fixed
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("Would fix") || stdout.contains("dry-run") || stdout.contains("test-skill"),
+        "--dry-run should show what would be fixed"
+    );
+}
