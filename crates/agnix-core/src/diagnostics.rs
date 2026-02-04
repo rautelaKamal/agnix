@@ -217,6 +217,9 @@ pub enum LintError {
     #[error("Not a regular file: {path}")]
     FileNotRegular { path: PathBuf },
 
+    #[error("Invalid exclude pattern: {pattern} ({message})")]
+    InvalidExcludePattern { pattern: String, message: String },
+
     #[error(transparent)]
     Other(anyhow::Error),
 }

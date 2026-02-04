@@ -168,6 +168,49 @@ jobs:
           build-from-source: 'true'
           fail-on-error: 'false'
 
+      - name: Test action (fail on error)
+        id: test-fail-on-error
+        uses: ./
+        continue-on-error: true
+        with:
+          path: './tests/fixtures/invalid/skills/invalid-name'
+          build-from-source: 'true'
+          fail-on-error: 'true'
+
+      - name: Verify fail-on-error behavior
+        if: steps.test-fail-on-error.outcome != 'failure'
+        shell: bash
+        run: |
+          echo "Expected fail-on-error to fail, but it did not."
+          exit 1
+
+      - name: Check release availability
+        id: release-check
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          CURL_OPTS=(-sL)
+          if [ -n "${GITHUB_TOKEN}" ]; then
+            CURL_OPTS+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+          fi
+          TAG=$(curl "${CURL_OPTS[@]}" "https://api.github.com/repos/avifenesh/agnix/releases/latest" | jq -r '.tag_name // empty')
+          if [ -n "${TAG}" ]; then
+            echo "available=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "available=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Test action (downloaded binary)
+        id: test-download
+        if: steps.release-check.outputs.available == 'true'
+        uses: ./
+        with:
+          path: './tests/fixtures/valid'
+          build-from-source: 'false'
+          fail-on-error: 'true'
+
   test-sarif-upload:
     name: Test SARIF Upload
     runs-on: ubuntu-latest
@@ -198,4 +241,3 @@ jobs:
         uses: github/codeql-action/upload-sarif@2588666de8825e1e9dc4e2329a4c985457d55b32 # v3
         with:
           sarif_file: ${{ steps.agnix.outputs.sarif-file }}
-        continue-on-error: true

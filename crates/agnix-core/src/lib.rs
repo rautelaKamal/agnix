@@ -307,7 +307,7 @@ fn normalize_rel_path(entry_path: &Path, root: &Path) -> String {
     path_str
 }
 
-fn compile_exclude_patterns(excludes: &[String]) -> Vec<ExcludePattern> {
+fn compile_exclude_patterns(excludes: &[String]) -> LintResult<Vec<ExcludePattern>> {
     excludes
         .iter()
         .map(|pattern| {
@@ -318,12 +318,16 @@ fn compile_exclude_patterns(excludes: &[String]) -> Vec<ExcludePattern> {
                 (normalized.clone(), None)
             };
             let allow_probe = dir_only_prefix.is_some() || glob_str.contains("**");
-            ExcludePattern {
-                pattern: glob::Pattern::new(&glob_str)
-                    .unwrap_or_else(|_| panic!("Invalid exclude pattern in config: {}", pattern)),
+            let compiled =
+                glob::Pattern::new(&glob_str).map_err(|e| LintError::InvalidExcludePattern {
+                    pattern: pattern.clone(),
+                    message: e.to_string(),
+                })?;
+            Ok(ExcludePattern {
+                pattern: compiled,
                 dir_only_prefix,
                 allow_probe,
-            }
+            })
         })
         .collect()
 }
@@ -360,8 +364,7 @@ pub fn validate_project_with_registry(
     config.set_root_dir(root_dir.clone());
 
     // Pre-compile exclude patterns once (avoids N+1 pattern compilation)
-    // Panic on invalid patterns to catch config errors early
-    let exclude_patterns = compile_exclude_patterns(&config.exclude);
+    let exclude_patterns = compile_exclude_patterns(&config.exclude)?;
     let exclude_patterns = Arc::new(exclude_patterns);
     let root_path = root_dir.clone();
 
@@ -3222,7 +3225,8 @@ Use idiomatic Rust patterns.
     #[test]
     fn test_should_prune_dir_with_globbed_patterns() {
         let patterns =
-            compile_exclude_patterns(&vec!["target/**".to_string(), "**/target/**".to_string()]);
+            compile_exclude_patterns(&vec!["target/**".to_string(), "**/target/**".to_string()])
+                .unwrap();
         assert!(
             should_prune_dir("target", &patterns),
             "Expected target/** to prune target directory"
@@ -3235,7 +3239,7 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_should_prune_dir_for_bare_pattern() {
-        let patterns = compile_exclude_patterns(&vec!["target".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target".to_string()]).unwrap();
         assert!(
             should_prune_dir("target", &patterns),
             "Bare pattern should prune directory"
@@ -3248,7 +3252,7 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_should_prune_dir_for_trailing_slash_pattern() {
-        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]).unwrap();
         assert!(
             should_prune_dir("target", &patterns),
             "Trailing slash pattern should prune directory"
@@ -3257,7 +3261,7 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_should_not_prune_root_dir() {
-        let patterns = compile_exclude_patterns(&vec!["target/**".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target/**".to_string()]).unwrap();
         assert!(
             !should_prune_dir("", &patterns),
             "Root directory should never be pruned"
@@ -3266,7 +3270,7 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_should_not_prune_dir_for_single_level_glob() {
-        let patterns = compile_exclude_patterns(&vec!["target/*".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target/*".to_string()]).unwrap();
         assert!(
             !should_prune_dir("target", &patterns),
             "Single-level glob should not prune directory"
@@ -3275,7 +3279,7 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_dir_only_pattern_does_not_exclude_file_named_dir() {
-        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]).unwrap();
         assert!(
             !is_excluded_file("target", &patterns),
             "Directory-only pattern should not exclude a file named target"
@@ -3284,11 +3288,20 @@ Use idiomatic Rust patterns.
 
     #[test]
     fn test_dir_only_pattern_excludes_files_under_dir() {
-        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]);
+        let patterns = compile_exclude_patterns(&vec!["target/".to_string()]).unwrap();
         assert!(
             is_excluded_file("target/file.txt", &patterns),
             "Directory-only pattern should exclude files under target/"
         );
+    }
+
+    #[test]
+    fn test_compile_exclude_patterns_invalid_pattern_returns_error() {
+        let result = compile_exclude_patterns(&vec!["[".to_string()]);
+        assert!(matches!(
+            result,
+            Err(LintError::InvalidExcludePattern { .. })
+        ));
     }
 
     // ===== ValidationResult files_checked Tests =====

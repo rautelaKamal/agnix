@@ -4,7 +4,7 @@
 //! validation rules by comparing expected vs actual diagnostics against labeled
 //! test cases.
 
-use crate::{validate_file, Diagnostic, LintConfig};
+use crate::{file_utils::safe_read_file, validate_file, Diagnostic, LintConfig, LintError};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -284,7 +284,7 @@ pub struct EvalManifest {
 impl EvalManifest {
     /// Load a manifest from a YAML file
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, EvalError> {
-        let content = std::fs::read_to_string(path.as_ref()).map_err(|e| EvalError::Io {
+        let content = safe_read_file(path.as_ref()).map_err(|e| EvalError::Read {
             path: path.as_ref().to_path_buf(),
             source: e,
         })?;
@@ -308,6 +308,13 @@ impl EvalManifest {
 /// Errors that can occur during evaluation
 #[derive(Debug, thiserror::Error)]
 pub enum EvalError {
+    #[error("Failed to read manifest: {path}")]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: LintError,
+    },
+
     #[error("Failed to read file: {path}")]
     Io {
         path: PathBuf,
@@ -800,10 +807,27 @@ cases:
         let result = EvalManifest::load("nonexistent-manifest-file.yaml");
         assert!(result.is_err());
         match result {
-            Err(EvalError::Io { path, .. }) => {
+            Err(EvalError::Read { path, .. }) => {
                 assert!(path.to_string_lossy().contains("nonexistent"));
             }
-            _ => panic!("Expected EvalError::Io"),
+            _ => panic!("Expected EvalError::Read"),
+        }
+    }
+
+    #[test]
+    fn test_eval_manifest_load_large_file_rejected() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let manifest_path = temp.path().join("large.yaml");
+        let content = vec![b'x'; (crate::file_utils::DEFAULT_MAX_FILE_SIZE + 1) as usize];
+        std::fs::write(&manifest_path, &content).unwrap();
+
+        let result = EvalManifest::load(&manifest_path);
+        assert!(result.is_err());
+        match result {
+            Err(EvalError::Read { source, .. }) => {
+                assert!(matches!(source, LintError::FileTooBig { .. }));
+            }
+            _ => panic!("Expected EvalError::Read"),
         }
     }
 

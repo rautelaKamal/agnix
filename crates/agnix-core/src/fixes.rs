@@ -1,7 +1,7 @@
 //! Fix application engine for automatic corrections
 
-use crate::diagnostics::{Diagnostic, Fix, LintError, LintResult};
-use crate::file_utils::safe_read_file;
+use crate::diagnostics::{Diagnostic, Fix, LintResult};
+use crate::file_utils::{safe_read_file, safe_write_file};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -69,10 +69,7 @@ pub fn apply_fixes(
 
         if fixed != original {
             if !dry_run {
-                std::fs::write(&path, &fixed).map_err(|e| LintError::FileWrite {
-                    path: path.clone(),
-                    source: e,
-                })?;
+                safe_write_file(&path, &fixed)?;
             }
 
             results.push(FixResult {

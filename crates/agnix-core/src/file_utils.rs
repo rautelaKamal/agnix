@@ -17,7 +17,10 @@
 
 use crate::diagnostics::{LintError, LintResult};
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
 use std::path::Path;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Default maximum file size (1 MiB = 1,048,576 bytes = 2^20 bytes)
 pub const DEFAULT_MAX_FILE_SIZE: u64 = 1_048_576;
@@ -37,6 +40,121 @@ pub const DEFAULT_MAX_FILE_SIZE: u64 = 1_048_576;
 /// Returns `LintError::FileRead` for other I/O errors.
 pub fn safe_read_file(path: &Path) -> LintResult<String> {
     safe_read_file_with_limit(path, DEFAULT_MAX_FILE_SIZE)
+}
+
+/// Safely write to an existing file with security checks.
+///
+/// This function:
+/// 1. Rejects symlinks (uses `symlink_metadata` to detect without following)
+/// 2. Rejects non-regular files (directories, FIFOs, sockets, devices)
+/// 3. Writes via a temporary file and atomic rename to reduce TOCTOU risk
+///
+/// # Errors
+///
+/// Returns `LintError::FileSymlink` if the path is a symlink.
+/// Returns `LintError::FileNotRegular` if the path is not a regular file.
+/// Returns `LintError::FileWrite` for other I/O errors.
+pub fn safe_write_file(path: &Path, content: &str) -> LintResult<()> {
+    let metadata = fs::symlink_metadata(path).map_err(|e| LintError::FileWrite {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+
+    if metadata.file_type().is_symlink() {
+        return Err(LintError::FileSymlink {
+            path: path.to_path_buf(),
+        });
+    }
+
+    if !metadata.is_file() {
+        return Err(LintError::FileNotRegular {
+            path: path.to_path_buf(),
+        });
+    }
+
+    let permissions = metadata.permissions();
+    let parent = path.parent().ok_or_else(|| LintError::FileWrite {
+        path: path.to_path_buf(),
+        source: io::Error::new(io::ErrorKind::Other, "Missing parent directory"),
+    })?;
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("file");
+
+    let (temp_path, mut temp_file) = {
+        let mut attempt = 0u32;
+        loop {
+            let unique = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            let candidate = parent.join(format!(
+                ".{}.agnix.tmp.{}",
+                file_name,
+                unique + attempt as u128
+            ));
+            match OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&candidate)
+            {
+                Ok(file) => break (candidate, file),
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists && attempt < 10 => {
+                    attempt += 1;
+                    continue;
+                }
+                Err(e) => {
+                    return Err(LintError::FileWrite {
+                        path: path.to_path_buf(),
+                        source: e,
+                    })
+                }
+            }
+        }
+    };
+
+    temp_file
+        .write_all(content.as_bytes())
+        .map_err(|e| LintError::FileWrite {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
+    temp_file.sync_all().map_err(|e| LintError::FileWrite {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+    drop(temp_file);
+
+    fs::set_permissions(&temp_path, permissions).map_err(|e| LintError::FileWrite {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+
+    let recheck = fs::symlink_metadata(path).map_err(|e| LintError::FileWrite {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+    if recheck.file_type().is_symlink() {
+        let _ = fs::remove_file(&temp_path);
+        return Err(LintError::FileSymlink {
+            path: path.to_path_buf(),
+        });
+    }
+    if !recheck.is_file() {
+        let _ = fs::remove_file(&temp_path);
+        return Err(LintError::FileNotRegular {
+            path: path.to_path_buf(),
+        });
+    }
+
+    fs::rename(&temp_path, path).map_err(|e| {
+        let _ = fs::remove_file(&temp_path);
+        LintError::FileWrite {
+            path: path.to_path_buf(),
+            source: e,
+        }
+    })
 }
 
 /// Safely read a file with a custom size limit.
@@ -184,6 +302,43 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_safe_write_file_updates_content() {
+        let temp = TempDir::new().unwrap();
+        let file_path = temp.path().join("write.md");
+        fs::write(&file_path, "before").unwrap();
+
+        let result = safe_write_file(&file_path, "after");
+        assert!(result.is_ok());
+
+        let content = fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "after");
+    }
+
+    #[test]
+    fn test_safe_write_file_rejects_directory() {
+        let temp = TempDir::new().unwrap();
+        let dir_path = temp.path().join("write_dir");
+        fs::create_dir(&dir_path).unwrap();
+
+        let result = safe_write_file(&dir_path, "nope");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LintError::FileNotRegular { .. }
+        ));
+    }
+
+    #[test]
+    fn test_safe_write_file_missing_file_returns_error() {
+        let temp = TempDir::new().unwrap();
+        let file_path = temp.path().join("missing.md");
+
+        let result = safe_write_file(&file_path, "content");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), LintError::FileWrite { .. }));
+    }
+
     // Symlink tests - only run on Unix-like systems where symlinks are common
     #[cfg(unix)]
     mod unix_tests {
@@ -235,6 +390,20 @@ mod tests {
             let result = safe_read_file(&link_path);
             assert!(result.is_err());
             // Dangling symlink is still a symlink
+            assert!(matches!(result.unwrap_err(), LintError::FileSymlink { .. }));
+        }
+
+        #[test]
+        fn test_safe_write_file_rejects_symlink() {
+            let temp = TempDir::new().unwrap();
+            let target_path = temp.path().join("target_write.md");
+            let link_path = temp.path().join("link_write.md");
+
+            fs::write(&target_path, "Target content").unwrap();
+            symlink(&target_path, &link_path).unwrap();
+
+            let result = safe_write_file(&link_path, "new content");
+            assert!(result.is_err());
             assert!(matches!(result.unwrap_err(), LintError::FileSymlink { .. }));
         }
     }
