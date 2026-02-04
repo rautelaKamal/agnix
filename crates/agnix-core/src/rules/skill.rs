@@ -937,10 +937,25 @@ fn frontmatter_key_line_col(
 
 fn frontmatter_key_offset(frontmatter: &str, key: &str) -> Option<usize> {
     let mut offset = 0usize;
+    let bytes = frontmatter.as_bytes();
+
     for line in frontmatter.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with('#') || trimmed.is_empty() {
-            offset += line.len() + 1;
+            // Calculate actual byte length including newline characters
+            let line_end = offset + line.len();
+            // Check for CRLF or LF
+            if line_end < bytes.len() {
+                if bytes[line_end] == b'\n' {
+                    offset = line_end + 1; // LF
+                } else if line_end + 1 < bytes.len() && bytes[line_end] == b'\r' && bytes[line_end + 1] == b'\n' {
+                    offset = line_end + 2; // CRLF
+                } else {
+                    offset = line_end; // No newline (last line)
+                }
+            } else {
+                offset = line_end; // End of string
+            }
             continue;
         }
         if let Some(rest) = trimmed.strip_prefix(key) {
@@ -949,7 +964,19 @@ fn frontmatter_key_offset(frontmatter: &str, key: &str) -> Option<usize> {
                 return Some(offset + column);
             }
         }
-        offset += line.len() + 1;
+        // Calculate actual byte length including newline characters
+        let line_end = offset + line.len();
+        if line_end < bytes.len() {
+            if bytes[line_end] == b'\n' {
+                offset = line_end + 1; // LF
+            } else if line_end + 1 < bytes.len() && bytes[line_end] == b'\r' && bytes[line_end + 1] == b'\n' {
+                offset = line_end + 2; // CRLF
+            } else {
+                offset = line_end; // No newline (last line)
+            }
+        } else {
+            offset = line_end; // End of string
+        }
     }
     None
 }
@@ -964,11 +991,24 @@ fn frontmatter_value_byte_range(
 ) -> Option<(usize, usize)> {
     let frontmatter = &parts.frontmatter;
     let mut offset = 0usize;
+    let bytes = frontmatter.as_bytes();
 
     for line in frontmatter.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with('#') || trimmed.is_empty() {
-            offset += line.len() + 1;
+            // Calculate actual byte length including newline characters
+            let line_end = offset + line.len();
+            if line_end < bytes.len() {
+                if bytes[line_end] == b'\n' {
+                    offset = line_end + 1; // LF
+                } else if line_end + 1 < bytes.len() && bytes[line_end] == b'\r' && bytes[line_end + 1] == b'\n' {
+                    offset = line_end + 2; // CRLF
+                } else {
+                    offset = line_end; // No newline (last line)
+                }
+            } else {
+                offset = line_end; // End of string
+            }
             continue;
         }
 
@@ -993,23 +1033,24 @@ fn frontmatter_value_byte_range(
                     if let Some(end_quote) = inner.find('"') {
                         (value_offset_in_line + 1, end_quote) // Skip opening quote
                     } else {
-                        // Unclosed quote, take whole value
-                        (value_offset_in_line, value_str.len())
+                        // Unclosed quote - return None for malformed YAML
+                        return None;
                     }
                 } else if let Some(inner) = value_str.strip_prefix('\'') {
                     // Single-quoted: find closing quote
                     if let Some(end_quote) = inner.find('\'') {
                         (value_offset_in_line + 1, end_quote) // Skip opening quote
                     } else {
-                        // Unclosed quote, take whole value
-                        (value_offset_in_line, value_str.len())
+                        // Unclosed quote - return None for malformed YAML
+                        return None;
                     }
                 } else {
                     // Unquoted value: take until end of line or comment
+                    // Check for both " #" (space-hash) and "\t#" (tab-hash)
                     let value_end = value_str
                         .find(" #")
-                        .unwrap_or(value_str.len())
-                        .min(value_str.len());
+                        .or_else(|| value_str.find("\t#"))
+                        .unwrap_or(value_str.len());
                     (value_offset_in_line, value_end)
                 };
 
@@ -1019,7 +1060,19 @@ fn frontmatter_value_byte_range(
                 return Some((abs_start, abs_end));
             }
         }
-        offset += line.len() + 1;
+        // Calculate actual byte length including newline characters
+        let line_end = offset + line.len();
+        if line_end < bytes.len() {
+            if bytes[line_end] == b'\n' {
+                offset = line_end + 1; // LF
+            } else if line_end + 1 < bytes.len() && bytes[line_end] == b'\r' && bytes[line_end + 1] == b'\n' {
+                offset = line_end + 2; // CRLF
+            } else {
+                offset = line_end; // No newline (last line)
+            }
+        } else {
+            offset = line_end; // End of string
+        }
     }
     None
 }
