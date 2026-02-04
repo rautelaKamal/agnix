@@ -477,6 +477,134 @@ pub fn validate_project_with_registry(
         }
     }
 
+    // XP-004, XP-005, XP-006: Cross-layer contradiction detection (project-level checks)
+    // These rules analyze relationships between multiple instruction files
+    let xp004_enabled = config.is_rule_enabled("XP-004");
+    let xp005_enabled = config.is_rule_enabled("XP-005");
+    let xp006_enabled = config.is_rule_enabled("XP-006");
+
+    if xp004_enabled || xp005_enabled || xp006_enabled {
+        // Collect instruction files (CLAUDE.md, AGENTS.md, etc.)
+        let instruction_files: Vec<_> = paths
+            .iter()
+            .filter(|p| schemas::cross_platform::is_instruction_file(p))
+            .collect();
+
+        if instruction_files.len() > 1 {
+            // Read content of all instruction files
+            let mut file_contents: Vec<(PathBuf, String)> = Vec::new();
+            for file_path in &instruction_files {
+                if let Ok(content) = file_utils::safe_read_file(file_path) {
+                    file_contents.push(((*file_path).clone(), content));
+                }
+            }
+
+            // XP-004: Detect conflicting build/test commands
+            if xp004_enabled {
+                let file_commands: Vec<_> = file_contents
+                    .iter()
+                    .map(|(path, content)| {
+                        (
+                            path.clone(),
+                            schemas::cross_platform::extract_build_commands(content),
+                        )
+                    })
+                    .filter(|(_, cmds)| !cmds.is_empty())
+                    .collect();
+
+                let build_conflicts = schemas::cross_platform::detect_build_conflicts(&file_commands);
+                for conflict in build_conflicts {
+                    diagnostics.push(
+                        Diagnostic::warning(
+                            conflict.file1.clone(),
+                            conflict.file1_line,
+                            0,
+                            "XP-004",
+                            format!(
+                                "Conflicting package managers: {} uses {} but {} uses {} for {} commands",
+                                conflict.file1.display(),
+                                conflict.file1_manager.as_str(),
+                                conflict.file2.display(),
+                                conflict.file2_manager.as_str(),
+                                match conflict.command_type {
+                                    schemas::cross_platform::CommandType::Install => "install",
+                                    schemas::cross_platform::CommandType::Build => "build",
+                                    schemas::cross_platform::CommandType::Test => "test",
+                                    schemas::cross_platform::CommandType::Run => "run",
+                                    schemas::cross_platform::CommandType::Other => "other",
+                                }
+                            ),
+                        )
+                        .with_suggestion(
+                            "Standardize on a single package manager across all instruction files".to_string(),
+                        ),
+                    );
+                }
+            }
+
+            // XP-005: Detect conflicting tool constraints
+            if xp005_enabled {
+                let file_constraints: Vec<_> = file_contents
+                    .iter()
+                    .map(|(path, content)| {
+                        (
+                            path.clone(),
+                            schemas::cross_platform::extract_tool_constraints(content),
+                        )
+                    })
+                    .filter(|(_, constraints)| !constraints.is_empty())
+                    .collect();
+
+                let tool_conflicts = schemas::cross_platform::detect_tool_conflicts(&file_constraints);
+                for conflict in tool_conflicts {
+                    diagnostics.push(
+                        Diagnostic::error(
+                            conflict.allow_file.clone(),
+                            conflict.allow_line,
+                            0,
+                            "XP-005",
+                            format!(
+                                "Conflicting tool constraints: '{}' is allowed in {} but disallowed in {}",
+                                conflict.tool_name,
+                                conflict.allow_file.display(),
+                                conflict.disallow_file.display()
+                            ),
+                        )
+                        .with_suggestion(
+                            "Resolve the conflict by consistently allowing or disallowing the tool".to_string(),
+                        ),
+                    );
+                }
+            }
+
+            // XP-006: Detect multiple layers without documented precedence
+            if xp006_enabled {
+                let layers: Vec<_> = file_contents
+                    .iter()
+                    .map(|(path, content)| schemas::cross_platform::categorize_layer(path, content))
+                    .collect();
+
+                if let Some(issue) = schemas::cross_platform::detect_precedence_issues(&layers) {
+                    // Report on the first layer file
+                    if let Some(first_layer) = issue.layers.first() {
+                        diagnostics.push(
+                            Diagnostic::warning(
+                                first_layer.path.clone(),
+                                1,
+                                0,
+                                "XP-006",
+                                issue.description,
+                            )
+                            .with_suggestion(
+                                "Document which file takes precedence (e.g., 'CLAUDE.md takes precedence over AGENTS.md')".to_string(),
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     // Sort by severity (errors first), then by file path, then by line/rule for full determinism
     diagnostics.sort_by(|a, b| {
         a.level
