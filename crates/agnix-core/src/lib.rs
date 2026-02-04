@@ -1563,6 +1563,228 @@ allowed-tools: Read Write
         assert!(agm_006.is_empty(), "AGM-006 should not fire when disabled");
     }
 
+    // ===== XP-004: Conflicting Build Commands =====
+
+    #[test]
+    fn test_xp_004_conflicting_package_managers() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md uses npm
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nUse `npm install` for dependencies.",
+        )
+        .unwrap();
+
+        // AGENTS.md uses pnpm
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nUse `pnpm install` for dependencies.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_004: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-004")
+            .collect();
+        assert!(
+            !xp_004.is_empty(),
+            "Should detect conflicting package managers"
+        );
+        assert!(xp_004.iter().any(|d| d.message.contains("npm")));
+        assert!(xp_004.iter().any(|d| d.message.contains("pnpm")));
+    }
+
+    #[test]
+    fn test_xp_004_no_conflict_same_manager() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Both files use npm
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nUse `npm install` for dependencies.",
+        )
+        .unwrap();
+
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nUse `npm run build` for building.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_004: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-004")
+            .collect();
+        assert!(
+            xp_004.is_empty(),
+            "Should not detect conflict when same package manager is used"
+        );
+    }
+
+    // ===== XP-005: Conflicting Tool Constraints =====
+
+    #[test]
+    fn test_xp_005_conflicting_tool_constraints() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md allows Bash
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nallowed-tools: Read Write Bash",
+        )
+        .unwrap();
+
+        // AGENTS.md disallows Bash
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nNever use Bash for operations.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(
+            !xp_005.is_empty(),
+            "Should detect conflicting tool constraints"
+        );
+        assert!(xp_005.iter().any(|d| d.message.contains("Bash")));
+    }
+
+    #[test]
+    fn test_xp_005_no_conflict_consistent_constraints() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Both files allow Read
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nallowed-tools: Read Write",
+        )
+        .unwrap();
+
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nYou can use Read for file access.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(
+            xp_005.is_empty(),
+            "Should not detect conflict when constraints are consistent"
+        );
+    }
+
+    // ===== XP-006: Layer Precedence =====
+
+    #[test]
+    fn test_xp_006_no_precedence_documentation() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Both files exist but neither documents precedence
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nThis is Claude.md.",
+        )
+        .unwrap();
+
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nThis is Agents.md.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_006: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-006")
+            .collect();
+        assert!(
+            !xp_006.is_empty(),
+            "Should detect missing precedence documentation"
+        );
+    }
+
+    #[test]
+    fn test_xp_006_with_precedence_documentation() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md documents precedence
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nCLAUDE.md takes precedence over AGENTS.md.",
+        )
+        .unwrap();
+
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nThis is Agents.md.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_006: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-006")
+            .collect();
+        assert!(
+            xp_006.is_empty(),
+            "Should not trigger XP-006 when precedence is documented"
+        );
+    }
+
+    #[test]
+    fn test_xp_006_single_layer_no_issue() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Only CLAUDE.md exists
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nThis is Claude.md.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_006: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-006")
+            .collect();
+        assert!(
+            xp_006.is_empty(),
+            "Should not trigger XP-006 with single instruction layer"
+        );
+    }
+
     // ===== AGM Validation Integration Tests =====
 
     #[test]
