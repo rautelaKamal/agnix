@@ -1787,6 +1787,233 @@ allowed-tools: Read Write
         );
     }
 
+    // ===== XP-004/005/006 Edge Case Tests (review findings) =====
+
+    #[test]
+    fn test_xp_004_three_files_conflicting_managers() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md uses npm
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nUse `npm install` for dependencies.",
+        )
+        .unwrap();
+
+        // AGENTS.md uses pnpm
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nUse `pnpm install` for dependencies.",
+        )
+        .unwrap();
+
+        // Add .cursor rules directory with yarn
+        let cursor_dir = temp.path().join(".cursor").join("rules");
+        std::fs::create_dir_all(&cursor_dir).unwrap();
+        std::fs::write(
+            cursor_dir.join("dev.mdc"),
+            "# Rules\n\nUse `yarn install` for dependencies.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_004: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-004")
+            .collect();
+
+        // Should detect conflicts between all three different package managers
+        assert!(
+            xp_004.len() >= 2,
+            "Should detect multiple conflicts with 3 different package managers, got {}",
+            xp_004.len()
+        );
+    }
+
+    #[test]
+    fn test_xp_004_disabled_rule() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md uses npm
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nUse `npm install` for dependencies.",
+        )
+        .unwrap();
+
+        // AGENTS.md uses pnpm
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nUse `pnpm install` for dependencies.",
+        )
+        .unwrap();
+
+        let mut config = LintConfig::default();
+        config.rules.disabled_rules = vec!["XP-004".to_string()];
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_004: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-004")
+            .collect();
+        assert!(xp_004.is_empty(), "XP-004 should not fire when disabled");
+    }
+
+    #[test]
+    fn test_xp_005_disabled_rule() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md allows Bash
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nallowed-tools: Read Write Bash",
+        )
+        .unwrap();
+
+        // AGENTS.md disallows Bash
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nNever use Bash for operations.",
+        )
+        .unwrap();
+
+        let mut config = LintConfig::default();
+        config.rules.disabled_rules = vec!["XP-005".to_string()];
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(xp_005.is_empty(), "XP-005 should not fire when disabled");
+    }
+
+    #[test]
+    fn test_xp_006_disabled_rule() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Both files exist but neither documents precedence
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nThis is Claude.md.",
+        )
+        .unwrap();
+
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nThis is Agents.md.",
+        )
+        .unwrap();
+
+        let mut config = LintConfig::default();
+        config.rules.disabled_rules = vec!["XP-006".to_string()];
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_006: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-006")
+            .collect();
+        assert!(xp_006.is_empty(), "XP-006 should not fire when disabled");
+    }
+
+    #[test]
+    fn test_xp_empty_instruction_files() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Create empty CLAUDE.md and AGENTS.md
+        std::fs::write(temp.path().join("CLAUDE.md"), "").unwrap();
+        std::fs::write(temp.path().join("AGENTS.md"), "").unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        // XP-004 should not fire for empty files (no commands)
+        let xp_004: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-004")
+            .collect();
+        assert!(xp_004.is_empty(), "Empty files should not trigger XP-004");
+
+        // XP-005 should not fire for empty files (no constraints)
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(xp_005.is_empty(), "Empty files should not trigger XP-005");
+    }
+
+    #[test]
+    fn test_xp_005_case_insensitive_tool_matching() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md allows BASH (uppercase)
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nallowed-tools: Read Write BASH",
+        )
+        .unwrap();
+
+        // AGENTS.md disallows bash (lowercase)
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nNever use bash for operations.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(
+            !xp_005.is_empty(),
+            "Should detect conflict between BASH and bash (case-insensitive)"
+        );
+    }
+
+    #[test]
+    fn test_xp_005_word_boundary_no_false_positive() {
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // CLAUDE.md allows Bash
+        std::fs::write(
+            temp.path().join("CLAUDE.md"),
+            "# Project\n\nallowed-tools: Read Write Bash",
+        )
+        .unwrap();
+
+        // AGENTS.md mentions "subash" (not "Bash")
+        std::fs::write(
+            temp.path().join("AGENTS.md"),
+            "# Project\n\nNever use subash command.",
+        )
+        .unwrap();
+
+        let config = LintConfig::default();
+        let result = validate_project(temp.path(), &config).unwrap();
+
+        let xp_005: Vec<_> = result
+            .diagnostics
+            .iter()
+            .filter(|d| d.rule == "XP-005")
+            .collect();
+        assert!(
+            xp_005.is_empty(),
+            "Should NOT detect conflict - 'subash' is not 'Bash'"
+        );
+    }
+
     // ===== AGM Validation Integration Tests =====
 
     #[test]
