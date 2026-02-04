@@ -30,3 +30,4 @@ STATUS.md
 .claude/tasks.json
 .claude/state/*
 .claude/workflow-status.json
+.claude/plan.md
