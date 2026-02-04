@@ -90,9 +90,9 @@ knowledge-base/
 | XML | 3 | 3 | 0 | 0 | 1 |
 | References | 2 | 2 | 0 | 0 | 0 |
 | Prompt Eng | 4 | 2 | 2 | 0 | 1 |
-| Cross-Platform | 3 | 2 | 1 | 0 | 0 |
+| Cross-Platform | 6 | 3 | 3 | 0 | 0 |
 | Cursor | 6 | 3 | 3 | 0 | 1 |
-| **TOTAL** | **99** | **74** | **24** | **3** | **22** |
+| **TOTAL** | **99** | **71** | **28** | **0** | **22** |
 
 ---
 

@@ -494,8 +494,19 @@ pub fn validate_project_with_registry(
             // Read content of all instruction files
             let mut file_contents: Vec<(PathBuf, String)> = Vec::new();
             for file_path in &instruction_files {
-                if let Ok(content) = file_utils::safe_read_file(file_path) {
-                    file_contents.push(((*file_path).clone(), content));
+                match file_utils::safe_read_file(file_path) {
+                    Ok(content) => {
+                        file_contents.push(((*file_path).clone(), content));
+                    }
+                    Err(e) => {
+                        diagnostics.push(Diagnostic::error(
+                            (*file_path).clone(),
+                            0,
+                            0,
+                            "XP-004",
+                            format!("Failed to read instruction file: {}", e),
+                        ));
+                    }
                 }
             }
 

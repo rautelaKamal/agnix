@@ -431,17 +431,20 @@ pub fn detect_build_conflicts(
                     if let (Some((path1, cmd1)), Some((path2, cmd2))) =
                         (entries1.first(), entries2.first())
                     {
-                        conflicts.push(BuildConflict {
-                            file1: path1.clone(),
-                            file1_line: cmd1.line,
-                            file1_manager: *manager1,
-                            file1_command: cmd1.raw_command.clone(),
-                            file2: path2.clone(),
-                            file2_line: cmd2.line,
-                            file2_manager: *manager2,
-                            file2_command: cmd2.raw_command.clone(),
-                            command_type: cmd_type,
-                        });
+                        // Skip if both commands are from the same file (false positive)
+                        if path1 != path2 {
+                            conflicts.push(BuildConflict {
+                                file1: path1.clone(),
+                                file1_line: cmd1.line,
+                                file1_manager: *manager1,
+                                file1_command: cmd1.raw_command.clone(),
+                                file2: path2.clone(),
+                                file2_line: cmd2.line,
+                                file2_manager: *manager2,
+                                file2_command: cmd2.raw_command.clone(),
+                                command_type: cmd_type,
+                            });
+                        }
                     }
                 }
             }
@@ -502,6 +505,24 @@ pub fn extract_tool_constraints(content: &str) -> Vec<ToolConstraint> {
         // Check for allow patterns
         if let Some(mat) = allow_pattern.find(line) {
             let matched = mat.as_str();
+
+            // Check for inline tool name captures first
+            if let Some(caps) = allow_pattern.captures(line) {
+                for i in 1..=6 {
+                    if let Some(tool_cap) = caps.get(i) {
+                        // Normalize to canonical tool name if it matches a known tool
+                        if let Some(canonical) = normalize_tool_name(tool_cap.as_str()) {
+                            results.push(ToolConstraint {
+                                line: line_num + 1,
+                                column: mat.start(),
+                                tool_name: canonical,
+                                constraint_type: ConstraintType::Allow,
+                                source_context: matched.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
 
             // Extract tool names from the line after the pattern
             let tools = extract_tool_names_from_line(line, mat.end());
