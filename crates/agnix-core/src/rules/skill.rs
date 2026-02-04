@@ -80,42 +80,36 @@ const MAX_INJECTIONS: usize = 3;
 /// - Trim leading/trailing hyphens
 /// - Truncate to 64 characters
 fn convert_to_kebab_case(name: &str) -> String {
-    let mut result = String::with_capacity(name.len());
+    let mut kebab = String::with_capacity(name.len());
+    let mut last_was_hyphen = true; // Use to trim leading hyphens and collapse consecutive ones
 
-    // Lowercase and replace invalid chars
     for c in name.chars() {
         if c.is_ascii_alphanumeric() {
-            result.push(c.to_ascii_lowercase());
-        } else if c == '_' || c == '-' || c == ' ' {
-            result.push('-');
-        }
-        // Skip other characters
-    }
-
-    // Collapse consecutive hyphens
-    let mut collapsed = String::with_capacity(result.len());
-    let mut prev_hyphen = false;
-    for c in result.chars() {
-        if c == '-' {
-            if !prev_hyphen {
-                collapsed.push(c);
+            kebab.push(c.to_ascii_lowercase());
+            last_was_hyphen = false;
+        } else if matches!(c, '_' | '-' | ' ') {
+            if !last_was_hyphen {
+                kebab.push('-');
+                last_was_hyphen = true;
             }
-            prev_hyphen = true;
-        } else {
-            collapsed.push(c);
-            prev_hyphen = false;
+        }
+        // Other characters are skipped
+    }
+
+    // Trim trailing hyphen if it exists
+    if last_was_hyphen && !kebab.is_empty() {
+        kebab.pop();
+    }
+
+    // Truncate and re-trim if necessary
+    if kebab.len() > 64 {
+        kebab.truncate(64);
+        while kebab.ends_with('-') {
+            kebab.pop();
         }
     }
 
-    // Trim leading/trailing hyphens
-    let trimmed = collapsed.trim_matches('-');
-
-    // Truncate to 64 characters
-    if trimmed.len() > 64 {
-        trimmed[..64].trim_end_matches('-').to_string()
-    } else {
-        trimmed.to_string()
-    }
+    kebab
 }
 
 /// Find byte positions of plain "Bash" (not scoped like "Bash(...)") in content
@@ -276,7 +270,7 @@ impl Validator for SkillValidator {
                             ),
                         )
                         .with_suggestion(
-                            "Lowercase the name, replace '_' with '-', and remove invalid characters".to_string(),
+                            "Lowercase and trim the name, replace spaces and '_' with '-', collapse multiple '-' into one, remove invalid characters, and truncate to 64 characters".to_string(),
                         );
 
                         // Add auto-fix if we can find the byte range and the fixed name is valid
@@ -1022,10 +1016,11 @@ fn frontmatter_value_byte_range(
         }
 
         if let Some(rest) = trimmed.strip_prefix(key) {
-            if let Some(after_colon) = rest.strip_prefix(':') {
+            if let Some(after_colon) = rest.trim_start().strip_prefix(':') {
                 // Found the key, now find the value
                 let leading_ws = line.len() - trimmed.len();
-                let key_end = leading_ws + key.len() + 1; // +1 for ':'
+                let ws_after_key = rest.len() - rest.trim_start().len();
+                let key_end = leading_ws + key.len() + ws_after_key + 1; // +1 for ':'
 
                 let value_str = after_colon.trim_start();
                 if value_str.is_empty() {
