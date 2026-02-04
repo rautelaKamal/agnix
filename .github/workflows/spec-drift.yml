@@ -35,6 +35,9 @@ jobs:
   check-drift:
     name: Check for spec drift
     runs-on: ubuntu-latest
+    outputs:
+      drift_detected: ${{ steps.drift-check.outputs.drift_detected }}
+      drift_sources: ${{ steps.drift-check.outputs.drift_sources }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
@@ -60,6 +63,7 @@ jobs:
           DRIFT_DETECTED=false
           DRIFT_REPORT=""
           NEW_HASHES=""
+          DRIFT_SOURCES_JSON="[]"
 
           # Determine which tiers to check based on trigger
           check_s_tier=false
@@ -123,6 +127,29 @@ jobs:
             echo "$hash"
           }
 
+          # Function to fetch GitHub diff for a repo
+          fetch_github_diff() {
+            local repo="$1"
+            local diff_output=""
+
+            # Get recent commits (last 7 days)
+            local since_date
+            since_date=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-7d +%Y-%m-%dT%H:%M:%SZ)
+
+            # Fetch recent commits
+            local commits
+            commits=$(gh api "repos/$repo/commits?since=$since_date" --jq '.[].sha' 2>/dev/null | head -5 || echo "")
+
+            if [[ -n "$commits" ]]; then
+              # Get diff summary for latest commit
+              local latest_sha
+              latest_sha=$(echo "$commits" | head -1)
+              diff_output=$(gh api "repos/$repo/commits/$latest_sha" --jq '.files[] | "- \(.filename): \(.additions) additions, \(.deletions) deletions"' 2>/dev/null | head -20 || echo "")
+            fi
+
+            echo "$diff_output"
+          }
+
           # Function to check sources in a tier
           check_tier() {
             local tier="$1"
@@ -132,9 +159,13 @@ jobs:
             for source in $sources; do
               local url
               local baseline_hash
+              local rules
+              local github_repo
 
               url=$(jq -r ".sources[\"$tier\"][\"$source\"].url" "$BASELINES_FILE")
               baseline_hash=$(jq -r ".sources[\"$tier\"][\"$source\"].hash" "$BASELINES_FILE")
+              rules=$(jq -r ".sources[\"$tier\"][\"$source\"].rules // [] | join(\", \")" "$BASELINES_FILE")
+              github_repo=$(jq -r ".sources[\"$tier\"][\"$source\"].github_repo // empty" "$BASELINES_FILE")
 
               echo "Checking: $source ($url)"
 
@@ -163,11 +194,34 @@ jobs:
                 echo "  DRIFT DETECTED: $source"
                 echo "    Baseline: ${baseline_hash:0:12}..."
                 echo "    Current:  ${current_hash:0:12}..."
-                DRIFT_REPORT="${DRIFT_REPORT}\n- **$source** ($tier): Content changed"
-                DRIFT_REPORT="${DRIFT_REPORT}\n  - URL: $url"
-                DRIFT_REPORT="${DRIFT_REPORT}\n  - Previous hash: \`${baseline_hash:0:12}...\`"
-                DRIFT_REPORT="${DRIFT_REPORT}\n  - Current hash: \`${current_hash:0:12}...\`"
+
+                DRIFT_REPORT="${DRIFT_REPORT}\n### $source ($tier)"
+                DRIFT_REPORT="${DRIFT_REPORT}\n- **URL**: $url"
+                DRIFT_REPORT="${DRIFT_REPORT}\n- **Previous hash**: \`${baseline_hash:0:12}...\`"
+                DRIFT_REPORT="${DRIFT_REPORT}\n- **Current hash**: \`${current_hash:0:12}...\`"
+
+                if [[ -n "$rules" ]]; then
+                  DRIFT_REPORT="${DRIFT_REPORT}\n- **Affected rules**: $rules"
+                fi
+
+                # Fetch GitHub diff if repo is available
+                if [[ -n "$github_repo" ]]; then
+                  echo "  Fetching GitHub diff for $github_repo..."
+                  local diff_info
+                  diff_info=$(fetch_github_diff "$github_repo")
+                  if [[ -n "$diff_info" ]]; then
+                    DRIFT_REPORT="${DRIFT_REPORT}\n- **Recent changes in repo**:"
+                    DRIFT_REPORT="${DRIFT_REPORT}\n\`\`\`"
+                    DRIFT_REPORT="${DRIFT_REPORT}\n$diff_info"
+                    DRIFT_REPORT="${DRIFT_REPORT}\n\`\`\`"
+                  fi
+                fi
+
+                DRIFT_REPORT="${DRIFT_REPORT}\n"
                 DRIFT_DETECTED=true
+
+                # Add to drift sources JSON for downstream jobs
+                DRIFT_SOURCES_JSON=$(echo "$DRIFT_SOURCES_JSON" | jq --arg src "$source" --arg tier "$tier" --arg url "$url" --arg rules "$rules" '. += [{"source": $src, "tier": $tier, "url": $url, "rules": $rules}]')
               else
                 echo "  OK: No change"
               fi
@@ -197,6 +251,9 @@ jobs:
             echo -e "$DRIFT_REPORT"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+          # Output drift sources JSON for downstream jobs
+          echo "drift_sources=$DRIFT_SOURCES_JSON" >> "$GITHUB_OUTPUT"
 
           # Output new hashes if update requested
           if [[ "$UPDATE_BASELINES" == "true" ]]; then
@@ -237,6 +294,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DRIFT_REPORT: ${{ steps.drift-check.outputs.drift_report }}
+          DRIFT_SOURCES: ${{ steps.drift-check.outputs.drift_sources }}
         run: |
           set -euo pipefail
 
@@ -246,25 +304,33 @@ jobs:
           # Check if an open issue already exists
           existing_issue=$(gh issue list --state open --label "$ISSUE_LABEL" --json number --jq '.[0].number // empty')
 
-          # Use report directly (multiline output preserved)
-          REPORT_BODY="$DRIFT_REPORT"
+          # Build affected rules list
+          ALL_RULES=$(echo "$DRIFT_SOURCES" | jq -r '.[].rules' | tr ',' '\n' | tr -d ' ' | sort -u | tr '\n' ', ' | sed 's/,$//')
 
           ISSUE_BODY="## Spec Drift Sentinel Alert
 
           The following upstream specification sources have changed since our last baseline check.
           These changes may require updates to agnix validation rules.
 
-          ### Changed Sources
-          $REPORT_BODY
+          ## Changed Sources
+          $DRIFT_REPORT
 
-          ### Action Required
+          ## Affected Rules Summary
+
+          The following rules may need review: \`$ALL_RULES\`
+
+          See each rule in:
+          - [\`knowledge-base/rules.json\`](../blob/main/knowledge-base/rules.json)
+          - [\`knowledge-base/VALIDATION-RULES.md\`](../blob/main/knowledge-base/VALIDATION-RULES.md)
+
+          ## Action Required
 
           1. **Review each changed source** to understand what has changed
           2. **Check if rule updates are needed** in \`knowledge-base/rules.json\`
           3. **Update VALIDATION-RULES.md** if rules are modified
           4. **Update baselines** by running the workflow with \`update_baselines: true\`
 
-          ### How to Update Baselines
+          ## How to Update Baselines
 
           Run the spec-drift workflow manually with:
           - \`update_baselines: true\`
@@ -287,3 +353,50 @@ jobs:
             # Use stdin to avoid shell interpretation of special characters
             echo "$ISSUE_BODY" | gh issue create --title "$ISSUE_TITLE" --body-file - --label "$ISSUE_LABEL"
           fi
+
+  # Trigger Claude to analyze the drift and suggest rule updates
+  trigger-claude-review:
+    name: Request Claude analysis
+    needs: check-drift
+    if: needs.check-drift.outputs.drift_detected == 'true' && inputs.update_baselines != true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Get drift issue number
+        id: get-issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUM=$(gh issue list --repo "${{ github.repository }}" --state open --label "spec-drift" --json number --jq '.[0].number // empty')
+          echo "issue_number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+
+      - name: Request Claude analysis
+        if: steps.get-issue.outputs.issue_number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRIFT_SOURCES: ${{ needs.check-drift.outputs.drift_sources }}
+          ISSUE_NUMBER: ${{ steps.get-issue.outputs.issue_number }}
+        run: |
+          # Build analysis request
+          SOURCES_LIST=$(echo "$DRIFT_SOURCES" | jq -r '.[] | "- \(.source) (\(.tier)): \(.url)"' | head -10)
+          RULES_LIST=$(echo "$DRIFT_SOURCES" | jq -r '.[].rules' | tr ',' '\n' | tr -d ' ' | sort -u | head -20 | tr '\n' ', ' | sed 's/,$//')
+
+          COMMENT_BODY="@claude Please analyze the spec drift detected above and help with the following:
+
+          **Changed sources:**
+          $SOURCES_LIST
+
+          **Potentially affected rules:** \`$RULES_LIST\`
+
+          **Analysis requested:**
+          1. Fetch the current content from each changed URL
+          2. Compare with our existing rules in \`knowledge-base/rules.json\`
+          3. Identify if any rules need updates based on spec changes
+          4. Suggest specific rule modifications if needed
+          5. Note any new capabilities or deprecations in the specs
+
+          Please provide a summary of findings and recommended actions."
+
+          echo "$COMMENT_BODY" | gh issue comment "$ISSUE_NUMBER" --repo "${{ github.repository }}" --body-file -
