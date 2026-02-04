@@ -336,10 +336,24 @@ fn scan_xml_tags_in_text(
     line_starts: &[usize],
     tags: &mut Vec<XmlTag>,
 ) {
-    let re = XML_TAG_REGEX.get_or_init(|| Regex::new(r"<(/?)([a-zA-Z_][a-zA-Z0-9_-]*)>").unwrap());
+    // Regex to match XML/HTML tags:
+    // - Group 1: "/" if closing tag (e.g., </tag>)
+    // - Group 2: tag name
+    // - Group 3: "/" if self-closing tag (e.g., <br/> or <img src="..." />)
+    // The (?:\s+[^>]*?)? handles attributes like <a id="foo"> or <img src="bar">
+    let re = XML_TAG_REGEX
+        .get_or_init(|| Regex::new(r"<(/?)([a-zA-Z_][a-zA-Z0-9_-]*)(?:\s+[^>]*?)?(/?)>").unwrap());
 
     for cap in re.captures_iter(text) {
         let is_closing = cap.get(1).is_some_and(|m| m.as_str() == "/");
+        let is_self_closing = cap.get(3).is_some_and(|m| m.as_str() == "/");
+
+        // Skip self-closing tags - they don't need balance checking
+        // Examples: <br/>, <hr />, <img src="..." />
+        if is_self_closing {
+            continue;
+        }
+
         if let Some(name_match) = cap.get(2) {
             let name = name_match.as_str().to_string();
             let start = cap.get(0).unwrap().start();
@@ -429,6 +443,68 @@ mod tests {
         let errors = check_xml_balance(&tags);
         assert_eq!(errors.len(), 1);
         assert!(matches!(errors[0], XmlBalanceError::Unclosed { .. }));
+    }
+
+    #[test]
+    fn test_xml_tags_with_attributes() {
+        // HTML anchor tags with id attribute should be properly balanced
+        let content = r#"<a id="test"></a>"#;
+        let tags = extract_xml_tags(content);
+        assert_eq!(tags.len(), 2);
+        assert!(!tags[0].is_closing); // <a id="test">
+        assert!(tags[1].is_closing); // </a>
+        let errors = check_xml_balance(&tags);
+        assert!(errors.is_empty(), "Tags with attributes should balance");
+    }
+
+    #[test]
+    fn test_xml_tags_with_multiple_attributes() {
+        let content = r#"<div class="foo" id="bar">content</div>"#;
+        let tags = extract_xml_tags(content);
+        assert_eq!(tags.len(), 2);
+        let errors = check_xml_balance(&tags);
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_xml_self_closing_tags() {
+        // Self-closing tags like <br/> should not cause balance errors
+        let content = "<br/>";
+        let tags = extract_xml_tags(content);
+        assert!(tags.is_empty(), "Self-closing tags should be skipped");
+    }
+
+    #[test]
+    fn test_xml_self_closing_with_space() {
+        // Self-closing tags with space like <br /> should also be skipped
+        let content = "<br />";
+        let tags = extract_xml_tags(content);
+        assert!(
+            tags.is_empty(),
+            "Self-closing tags with space should be skipped"
+        );
+    }
+
+    #[test]
+    fn test_xml_self_closing_with_attributes() {
+        // Self-closing tags with attributes should be skipped
+        let content = r#"<img src="test.png" />"#;
+        let tags = extract_xml_tags(content);
+        assert!(
+            tags.is_empty(),
+            "Self-closing tags with attributes should be skipped"
+        );
+    }
+
+    #[test]
+    fn test_xml_mixed_tags_and_self_closing() {
+        // Mix of regular tags and self-closing tags
+        let content = r#"<div><br/><span>text</span><hr /></div>"#;
+        let tags = extract_xml_tags(content);
+        // Should have: <div>, <span>, </span>, </div> (br and hr are self-closing)
+        assert_eq!(tags.len(), 4);
+        let errors = check_xml_balance(&tags);
+        assert!(errors.is_empty());
     }
 
     #[test]

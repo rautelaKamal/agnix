@@ -164,59 +164,59 @@ knowledge-base/
 ### Week 3: Core Rules (P0)
 
 Parser Setup:
-- [ ] YAML frontmatter parser
-- [ ] JSON config parser
-- [ ] Markdown @import extractor
-- [ ] XML tag parser
+- [x] YAML frontmatter parser
+- [x] JSON config parser
+- [x] Markdown @import extractor
+- [x] XML tag parser
 
 Skills Validation:
-- [ ] AS-001: Frontmatter exists
-- [ ] AS-002: Name field exists
-- [ ] AS-003: Description field exists
-- [ ] AS-004: Name format valid
-- [ ] AS-010: Trigger phrase present
-- [ ] CC-SK-001: Model value valid
-- [ ] CC-SK-006: Dangerous auto-invocation
-- [ ] CC-SK-007: Unrestricted Bash
+- [x] AS-001: Frontmatter exists
+- [x] AS-002: Name field exists
+- [x] AS-003: Description field exists
+- [x] AS-004: Name format valid
+- [x] AS-010: Trigger phrase present
+- [x] CC-SK-001: Model value valid
+- [x] CC-SK-006: Dangerous auto-invocation
+- [x] CC-SK-007: Unrestricted Bash
 
 Hooks Validation:
-- [ ] CC-HK-001: Valid event name
-- [ ] CC-HK-002: Prompt hook restriction
-- [ ] CC-HK-003: Matcher required
-- [ ] CC-HK-005: Type field exists
+- [x] CC-HK-001: Valid event name
+- [x] CC-HK-002: Prompt hook restriction
+- [x] CC-HK-003: Matcher required
+- [x] CC-HK-005: Type field exists
 - [x] CC-HK-006: Missing command field
 - [x] CC-HK-007: Missing prompt field
 - [x] CC-HK-008: Script file not found
 - [x] CC-HK-009: Dangerous command pattern
 
 Memory Validation:
-- [ ] CC-MEM-001: Import paths exist
-- [ ] CC-MEM-005: Generic instructions
+- [x] CC-MEM-001: Import paths exist
+- [x] CC-MEM-005: Generic instructions
 
 XML & References:
-- [ ] XML-001: Tag balance
-- [ ] REF-001: Import resolution
+- [x] XML-001: Tag balance
+- [x] REF-001: Import resolution
 
 ### Week 4: Quality Rules (P1)
 
 Skills:
-- [ ] AS-011 through AS-015
-- [ ] CC-SK-002 through CC-SK-005
+- [x] AS-011 through AS-015
+- [x] CC-SK-002 through CC-SK-005
 
 Memory:
-- [ ] CC-MEM-006 through CC-MEM-010
+- [x] CC-MEM-006 through CC-MEM-010
 
 Agents:
-- [ ] CC-AG-001 through CC-AG-006
+- [x] CC-AG-001 through CC-AG-006
 
 Plugins:
-- [ ] CC-PL-001 through CC-PL-005
+- [x] CC-PL-001 through CC-PL-005
 
 ### Week 5-6: Advanced (P2)
 
-- [ ] MCP protocol validation
-- [ ] Prompt engineering analysis
-- [ ] Cross-platform compatibility
+- [x] MCP protocol validation
+- [x] Prompt engineering analysis
+- [x] Cross-platform compatibility
 
 ---
 
