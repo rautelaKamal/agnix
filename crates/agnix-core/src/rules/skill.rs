@@ -285,8 +285,18 @@ impl Validator for SkillValidator {
                                 frontmatter_value_byte_range(content, &parts, "name")
                             {
                                 // Determine if fix is safe: only case changes are safe
-                                let is_case_only =
-                                    name_trimmed.to_lowercase() == fixed_name;
+                                // A fix is case-only if:
+                                // 1. No underscores in original (would be converted to hyphens)
+                                // 2. No spaces in original (would be converted to hyphens)
+                                // 3. No invalid chars removed
+                                // 4. Only lowercasing was needed
+                                let has_structural_changes = name_trimmed.contains('_')
+                                    || name_trimmed.contains(' ')
+                                    || name_trimmed
+                                        .chars()
+                                        .any(|c| !c.is_ascii_alphanumeric() && c != '-');
+                                let is_case_only = !has_structural_changes
+                                    && name_trimmed.to_lowercase() == fixed_name;
                                 let fix = Fix::replace(
                                     start,
                                     end,
@@ -2729,6 +2739,43 @@ Body"#;
         fixed.replace_range(fix.start_byte..fix.end_byte, &fix.replacement);
         // The fix replaces the inner value, keeping quotes in place
         assert!(fixed.contains("bad-name"));
+    }
+
+    #[test]
+    fn test_as_004_no_fix_when_converts_to_empty() {
+        // Name with only special characters should convert to empty string
+        let content = r#"---
+name: "!@#$%"
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        // Should have no fix since converted name would be empty
+        assert!(!as_004[0].has_fixes());
+    }
+
+    #[test]
+    fn test_as_004_underscore_to_hyphen_is_unsafe() {
+        // Test_Name -> test-name involves underscore replacement, should be unsafe
+        let content = r#"---
+name: test_name
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+        // Underscore to hyphen is structural change, not safe
+        assert!(!as_004[0].fixes[0].safe);
     }
 
     // ===== AS-010 Auto-fix Tests =====

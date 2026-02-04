@@ -1720,3 +1720,81 @@ fn test_dry_run_shows_as_004_fix_without_applying() {
         "--dry-run should show what would be fixed"
     );
 }
+
+#[test]
+fn test_fix_both_as_004_and_as_010_simultaneously() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        // Both AS-004 (invalid name) and AS-010 (missing trigger)
+        write!(
+            file,
+            "---\nname: Test_Skill\ndescription: Does testing\n---\nBody"
+        )
+        .unwrap();
+    }
+
+    // Run with --fix
+    let mut cmd = agnix();
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix")
+        .output()
+        .unwrap();
+
+    // Read the fixed file
+    let fixed_content = fs::read_to_string(&skill_path).unwrap();
+
+    // Both fixes should be applied
+    assert!(
+        fixed_content.contains("name: test-skill"),
+        "AS-004 fix should be applied, got: {}",
+        fixed_content
+    );
+    assert!(
+        fixed_content.contains("Use when user wants to Does testing"),
+        "AS-010 fix should be applied, got: {}",
+        fixed_content
+    );
+}
+
+#[test]
+fn test_fix_safe_skips_structural_as_004() {
+    use std::fs;
+    use std::io::Write;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let skills_dir = temp_dir.path().join("skills").join("test-skill");
+    fs::create_dir_all(&skills_dir).unwrap();
+
+    let skill_path = skills_dir.join("SKILL.md");
+    let original_content =
+        "---\nname: test_skill_name\ndescription: Use when testing\n---\nBody";
+    {
+        let mut file = fs::File::create(&skill_path).unwrap();
+        // Name with underscores = structural change (not just case)
+        write!(file, "{}", original_content).unwrap();
+    }
+
+    // Run with --fix-safe
+    let mut cmd = agnix();
+    cmd.arg(temp_dir.path().to_str().unwrap())
+        .arg("--fix-safe")
+        .output()
+        .unwrap();
+
+    // Read the file
+    let content_after = fs::read_to_string(&skill_path).unwrap();
+
+    // Structural AS-004 fix is NOT safe, should NOT be applied
+    assert_eq!(
+        content_after, original_content,
+        "--fix-safe should not apply structural AS-004 fix"
+    );
+}
