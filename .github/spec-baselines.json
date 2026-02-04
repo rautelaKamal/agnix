@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Baseline content hashes for spec-drift sentinel. Updated automatically by workflow.",
-  "last_updated": "2025-02-04T00:00:00Z",
+  "last_updated": "2026-02-04T00:00:00Z",
   "sources": {
     "s-tier": {
       "agent-skills-spec": {

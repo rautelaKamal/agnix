@@ -72,11 +72,13 @@ jobs:
               all) check_s_tier=true; check_a_tier=true ;;
             esac
           elif [[ "${{ github.event_name }}" == "schedule" ]]; then
-            # Weekly schedule (Sunday) = S-tier
+            # Each cron schedule triggers a separate workflow run
+            # SCHEDULE_CRON contains the specific cron that triggered THIS run
+            # Weekly schedule (Sunday midnight UTC) = S-tier sources
             if [[ "$SCHEDULE_CRON" == "0 0 * * 0" ]]; then
               check_s_tier=true
             fi
-            # Monthly schedule (1st) = A-tier
+            # Monthly schedule (1st midnight UTC) = A-tier sources
             if [[ "$SCHEDULE_CRON" == "0 0 1 * *" ]]; then
               check_a_tier=true
             fi
@@ -276,10 +278,12 @@ jobs:
 
           if [[ -n "$existing_issue" ]]; then
             echo "Updating existing issue #$existing_issue"
-            gh issue comment "$existing_issue" --body "$ISSUE_BODY"
+            # Use stdin to avoid shell interpretation of special characters
+            echo "$ISSUE_BODY" | gh issue comment "$existing_issue" --body-file -
           else
             echo "Creating new drift issue"
             # Ensure label exists
             gh label create "$ISSUE_LABEL" --description "Upstream spec changes detected" --color "FFA500" 2>/dev/null || true
-            gh issue create --title "$ISSUE_TITLE" --body "$ISSUE_BODY" --label "$ISSUE_LABEL"
+            # Use stdin to avoid shell interpretation of special characters
+            echo "$ISSUE_BODY" | gh issue create --title "$ISSUE_TITLE" --body-file - --label "$ISSUE_LABEL"
           fi
