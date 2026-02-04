@@ -6,65 +6,53 @@
     "s-tier": {
       "agent-skills-spec": {
         "url": "https://agentskills.io/specification",
-        "hash": "",
-        "description": "Agent Skills specification - primary source for skill definitions"
+        "hash": ""
       },
       "mcp-spec": {
         "url": "https://modelcontextprotocol.io/specification/2025-11-25",
-        "hash": "",
-        "description": "Model Context Protocol specification"
+        "hash": ""
       },
       "claude-code-memory": {
         "url": "https://code.claude.com/docs/en/memory",
-        "hash": "",
-        "description": "Claude Code memory/CLAUDE.md documentation"
+        "hash": ""
       },
       "claude-code-hooks": {
         "url": "https://code.claude.com/docs/en/hooks",
-        "hash": "",
-        "description": "Claude Code hooks documentation"
+        "hash": ""
       },
       "claude-code-skills": {
         "url": "https://code.claude.com/docs/en/skills",
-        "hash": "",
-        "description": "Claude Code skills documentation"
+        "hash": ""
       },
       "claude-code-plugins": {
         "url": "https://code.claude.com/docs/en/plugins-reference",
-        "hash": "",
-        "description": "Claude Code plugins reference"
+        "hash": ""
       },
       "claude-code-subagents": {
         "url": "https://code.claude.com/docs/en/sub-agents",
-        "hash": "",
-        "description": "Claude Code sub-agents documentation"
+        "hash": ""
       },
       "codex-cli-agents-md": {
         "url": "https://developers.openai.com/codex/guides/agents-md/",
-        "hash": "",
-        "description": "OpenAI Codex CLI AGENTS.md guide"
+        "hash": ""
       },
       "opencode-rules": {
         "url": "https://opencode.ai/docs/rules/",
-        "hash": "",
-        "description": "OpenCode rules documentation"
+        "hash": ""
       }
     },
     "a-tier": {
       "cursor-rules": {
         "url": "https://cursor.com/docs/context/rules",
-        "hash": "",
-        "description": "Cursor .cursorrules documentation"
+        "hash": ""
       },
       "github-copilot": {
         "url": "https://docs.github.com/en/copilot/customizing-copilot",
-        "hash": "",
-        "description": "GitHub Copilot customization documentation"
+        "hash": ""
       },
       "cline-rules": {
         "url": "https://docs.cline.bot/features/cline-rules/overview",
-        "hash": "",
-        "description": "Cline rules documentation"
+        "hash": ""
       }
     }
   }

@@ -74,7 +74,6 @@ jobs:
               check_a_tier=true
             fi
           else
-            # Default: check all (for testing)
             check_s_tier=true
             check_a_tier=true
           fi
@@ -200,8 +199,6 @@ jobs:
             echo ""
             echo "Updated baselines file:"
             cat "$temp_file"
-            echo ""
-            echo "To update baselines, copy the above JSON to .github/spec-baselines.json"
           fi
 
           if [[ "$DRIFT_DETECTED" == "true" ]]; then
