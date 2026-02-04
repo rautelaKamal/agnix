@@ -332,8 +332,10 @@ pub fn extract_build_commands(content: &str) -> Vec<BuildCommand> {
             };
 
             // Determine command type
+            // Note: " i " requires space after, but "npm i" at end of line needs special handling
             let command_type = if raw.contains(" install")
                 || raw.contains(" i ")
+                || raw.ends_with(" i")
                 || raw.contains(" add")
                 || raw.contains(" ci")
             {
@@ -849,6 +851,16 @@ pub fn is_instruction_file(path: &Path) -> bool {
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_lowercase();
+
+    // Skip backup/temp files
+    if path_str.ends_with(".bak")
+        || path_str.ends_with(".old")
+        || path_str.ends_with(".tmp")
+        || path_str.ends_with(".swp")
+        || path_str.ends_with('~')
+    {
+        return false;
+    }
 
     file_name == "claude.md"
         || file_name == "agents.md"
@@ -1640,5 +1652,120 @@ Use pnpm install for dependencies.
             conflicts.is_empty(),
             "Files with no constraints should have no conflicts"
         );
+    }
+
+    // ===== Short-form package manager command detection (issue fix) =====
+
+    #[test]
+    fn test_npm_i_without_trailing_space() {
+        // "npm i" at end of line should be detected as Install
+        let content = "Run `npm i` to install";
+        let results = extract_build_commands(content);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].package_manager, PackageManager::Npm);
+        assert_eq!(
+            results[0].command_type,
+            CommandType::Install,
+            "npm i without trailing space should be Install"
+        );
+    }
+
+    #[test]
+    fn test_yarn_i_at_end_of_content() {
+        // "yarn i\n" at end of content should be detected as Install
+        let content = "Install with yarn i\n";
+        let results = extract_build_commands(content);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].package_manager, PackageManager::Yarn);
+        assert_eq!(
+            results[0].command_type,
+            CommandType::Install,
+            "yarn i at end of line should be Install"
+        );
+    }
+
+    #[test]
+    fn test_pnpm_i_standalone() {
+        // "pnpm i" as standalone command
+        let content = "pnpm i";
+        let results = extract_build_commands(content);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].package_manager, PackageManager::Pnpm);
+        assert_eq!(
+            results[0].command_type,
+            CommandType::Install,
+            "pnpm i should be Install"
+        );
+    }
+
+    #[test]
+    fn test_bun_i_end_of_line() {
+        // "bun i" at end of line in multi-line content
+        let content = "First run bun i\nThen run bun run build";
+        let results = extract_build_commands(content);
+        assert_eq!(results.len(), 2);
+
+        let install_cmd = results.iter().find(|r| r.raw_command.contains(" i"));
+        assert!(install_cmd.is_some());
+        assert_eq!(install_cmd.unwrap().command_type, CommandType::Install);
+    }
+
+    // ===== Backup file exclusion tests (issue fix) =====
+
+    #[test]
+    fn test_backup_file_claude_md_bak() {
+        use std::path::PathBuf;
+        assert!(
+            !is_instruction_file(&PathBuf::from("CLAUDE.md.bak")),
+            "CLAUDE.md.bak should NOT be considered an instruction file"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_agents_md_old() {
+        use std::path::PathBuf;
+        assert!(
+            !is_instruction_file(&PathBuf::from("AGENTS.md.old")),
+            "AGENTS.md.old should NOT be considered an instruction file"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_cursor_rules_tmp() {
+        use std::path::PathBuf;
+        assert!(
+            !is_instruction_file(&PathBuf::from(".cursor/rules/test.mdc.tmp")),
+            ".cursor/rules/test.mdc.tmp should NOT be considered an instruction file"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_swp() {
+        use std::path::PathBuf;
+        assert!(
+            !is_instruction_file(&PathBuf::from("CLAUDE.md.swp")),
+            "CLAUDE.md.swp should NOT be considered an instruction file"
+        );
+    }
+
+    #[test]
+    fn test_backup_file_tilde() {
+        use std::path::PathBuf;
+        assert!(
+            !is_instruction_file(&PathBuf::from("AGENTS.md~")),
+            "AGENTS.md~ should NOT be considered an instruction file"
+        );
+    }
+
+    #[test]
+    fn test_valid_instruction_files_still_work() {
+        use std::path::PathBuf;
+        // Ensure normal files still work after adding backup exclusion
+        assert!(is_instruction_file(&PathBuf::from("CLAUDE.md")));
+        assert!(is_instruction_file(&PathBuf::from("AGENTS.md")));
+        assert!(is_instruction_file(&PathBuf::from(".cursor/rules/test.mdc")));
+        assert!(is_instruction_file(&PathBuf::from(
+            ".github/copilot-instructions.md"
+        )));
     }
 }
