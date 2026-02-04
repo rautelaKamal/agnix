@@ -75,6 +75,9 @@ agnix --format sarif .
 
 # Generate config file
 agnix init
+
+# Evaluate rule efficacy
+agnix eval tests/eval.yaml
 ```
 
 ## Output
