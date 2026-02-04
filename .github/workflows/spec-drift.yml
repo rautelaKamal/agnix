@@ -107,10 +107,12 @@ jobs:
             fi
 
             # Fetch with curl, follow redirects, timeout after 30s
-            content=$(curl -fsSL --max-time 30 "$url" 2>/dev/null || echo "FETCH_FAILED")
+            # Use separate variable for exit code to avoid partial content issues
+            local exit_code
+            content=$(curl -fsSL --max-time 30 "$url" 2>/dev/null) && exit_code=0 || exit_code=$?
 
-            if [[ "$content" == "FETCH_FAILED" || "$content" == "INVALID_URL" ]]; then
-              echo "$content"
+            if [[ $exit_code -ne 0 ]]; then
+              echo "FETCH_FAILED"
               return
             fi
 
