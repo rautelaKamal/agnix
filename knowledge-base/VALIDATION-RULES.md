@@ -54,7 +54,7 @@
 ```rust
 !Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").matches(name) || name.len() > 64
 ```
-**Fix**: Lowercase + replace `_` with `-` + remove invalid chars
+**Fix**: [AUTO-FIX] Convert name to kebab-case (lowercase, replace `_` with `-`, remove invalid chars, collapse consecutive hyphens, truncate to 64 chars)
 **Source**: agentskills.io/specification
 
 <a id="as-005"></a>
@@ -96,7 +96,7 @@
 ### AS-010 [MEDIUM] Missing Trigger Phrase
 **Requirement**: description SHOULD include "Use when" trigger
 **Detection**: `!description.to_lowercase().contains("use when")`
-**Fix**: Prepend "Use when user asks to..."
+**Fix**: [AUTO-FIX] Prepend "Use when user wants to " to description
 **Source**: awesome-slash/enhance-skills, platform.claude.com/docs
 
 <a id="as-011"></a>
@@ -790,8 +790,8 @@ pub fn validate_skill(path: &Path, content: &str) -> Vec<Diagnostic> {
 | Rule | Auto-Fix | Safety |
 |------|----------|--------|
 | AS-001 | Add frontmatter template | HIGH |
-| AS-004 | Lowercase + replace _ with - | HIGH |
-| AS-010 | Add "Use when..." prefix | MEDIUM |
+| AS-004 | Convert to kebab-case | HIGH (case-only) / MEDIUM (structural) |
+| AS-010 | Prepend "Use when user wants to " | MEDIUM |
 | CC-SK-007 | Suggest Bash(git:*) | MEDIUM |
 | CC-MEM-005 | Remove line | HIGH |
 | CC-MEM-007 | Replace weak language with strong | MEDIUM |

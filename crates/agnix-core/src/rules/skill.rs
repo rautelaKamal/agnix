@@ -72,6 +72,44 @@ const KNOWN_TOOLS: &[&str] = &[
 /// Maximum dynamic injections for CC-SK-009
 const MAX_INJECTIONS: usize = 3;
 
+/// Convert a name to kebab-case format.
+/// - Lowercase the name
+/// - Replace underscores with hyphens
+/// - Remove invalid characters (not a-z, 0-9, or -)
+/// - Collapse consecutive hyphens
+/// - Trim leading/trailing hyphens
+/// - Truncate to 64 characters
+fn convert_to_kebab_case(name: &str) -> String {
+    let mut kebab = String::with_capacity(name.len());
+    let mut last_was_hyphen = true; // Use to trim leading hyphens and collapse consecutive ones
+
+    for c in name.chars() {
+        if c.is_ascii_alphanumeric() {
+            kebab.push(c.to_ascii_lowercase());
+            last_was_hyphen = false;
+        } else if matches!(c, '_' | '-' | ' ') && !last_was_hyphen {
+            kebab.push('-');
+            last_was_hyphen = true;
+        }
+        // Other characters are skipped
+    }
+
+    // Trim trailing hyphen if it exists
+    if last_was_hyphen && !kebab.is_empty() {
+        kebab.pop();
+    }
+
+    // Truncate and re-trim if necessary
+    if kebab.len() > 64 {
+        kebab.truncate(64);
+        while kebab.ends_with('-') {
+            kebab.pop();
+        }
+    }
+
+    kebab
+}
+
 /// Find byte positions of plain "Bash" (not scoped like "Bash(...)") in content
 /// Returns Vec of (start_byte, end_byte) for each occurrence
 fn find_plain_bash_positions(content: &str, search_start: usize) -> Vec<(usize, usize)> {
@@ -218,21 +256,51 @@ impl Validator for SkillValidator {
                     let name_re = NAME_FORMAT_REGEX
                         .get_or_init(|| Regex::new(r"^[a-z0-9]+(-[a-z0-9]+)*$").unwrap());
                     if name_trimmed.len() > 64 || !name_re.is_match(name_trimmed) {
-                        diagnostics.push(
-                            Diagnostic::error(
-                                path.to_path_buf(),
-                                name_line,
-                                name_col,
-                                "AS-004",
-                                format!(
-                                    "Name '{}' must be 1-64 characters of lowercase letters, digits, and hyphens",
-                                    name_trimmed
-                                ),
-                            )
-                            .with_suggestion(
-                                "Lowercase the name, replace '_' with '-', and remove invalid characters".to_string(),
+                        let fixed_name = convert_to_kebab_case(name_trimmed);
+                        let mut diagnostic = Diagnostic::error(
+                            path.to_path_buf(),
+                            name_line,
+                            name_col,
+                            "AS-004",
+                            format!(
+                                "Name '{}' must be 1-64 characters of lowercase letters, digits, and hyphens",
+                                name_trimmed
                             ),
+                        )
+                        .with_suggestion(
+                            "Lowercase and trim the name, replace spaces and '_' with '-', collapse multiple '-' into one, remove invalid characters, and truncate to 64 characters".to_string(),
                         );
+
+                        // Add auto-fix if we can find the byte range and the fixed name is valid
+                        if !fixed_name.is_empty() && name_re.is_match(&fixed_name) {
+                            if let Some((start, end)) =
+                                frontmatter_value_byte_range(content, &parts, "name")
+                            {
+                                // Determine if fix is safe: only case changes are safe
+                                // A fix is case-only if:
+                                // 1. No underscores in original (would be converted to hyphens)
+                                // 2. No spaces in original (would be converted to hyphens)
+                                // 3. No invalid chars removed
+                                // 4. Only lowercasing was needed
+                                let has_structural_changes = name_trimmed.contains('_')
+                                    || name_trimmed.contains(' ')
+                                    || name_trimmed
+                                        .chars()
+                                        .any(|c| !c.is_ascii_alphanumeric() && c != '-');
+                                let is_case_only = !has_structural_changes
+                                    && name_trimmed.to_lowercase() == fixed_name;
+                                let fix = Fix::replace(
+                                    start,
+                                    end,
+                                    &fixed_name,
+                                    format!("Convert name to kebab-case: '{}'", fixed_name),
+                                    is_case_only,
+                                );
+                                diagnostic = diagnostic.with_fix(fix);
+                            }
+                        }
+
+                        diagnostics.push(diagnostic);
                     }
                 }
 
@@ -330,19 +398,38 @@ impl Validator for SkillValidator {
                 if config.is_rule_enabled("AS-010") && !description_trimmed.is_empty() {
                     let desc_lower = description_trimmed.to_lowercase();
                     if !desc_lower.contains("use when") {
-                        diagnostics.push(
-                            Diagnostic::warning(
-                                path.to_path_buf(),
-                                description_line,
-                                description_col,
-                                "AS-010",
-                                "Description should include a 'Use when...' trigger phrase"
-                                    .to_string(),
-                            )
-                            .with_suggestion(
-                                "Add 'Use when [condition]' to help Claude understand when to invoke this skill".to_string(),
-                            ),
+                        let mut diagnostic = Diagnostic::warning(
+                            path.to_path_buf(),
+                            description_line,
+                            description_col,
+                            "AS-010",
+                            "Description should include a 'Use when...' trigger phrase"
+                                .to_string(),
+                        )
+                        .with_suggestion(
+                            "Add 'Use when [condition]' to help Claude understand when to invoke this skill".to_string(),
                         );
+
+                        // Add auto-fix: prepend "Use when user wants to " to description
+                        if let Some((start, end)) =
+                            frontmatter_value_byte_range(content, &parts, "description")
+                        {
+                            let new_description =
+                                format!("Use when user wants to {}", description_trimmed);
+                            // Check if the new description would exceed length limit
+                            if new_description.len() <= 1024 {
+                                let fix = Fix::replace(
+                                    start,
+                                    end,
+                                    &new_description,
+                                    "Prepend 'Use when user wants to ' to description",
+                                    false, // Not safe - changes semantics
+                                );
+                                diagnostic = diagnostic.with_fix(fix);
+                            }
+                        }
+
+                        diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -842,10 +929,28 @@ fn frontmatter_key_line_col(
 
 fn frontmatter_key_offset(frontmatter: &str, key: &str) -> Option<usize> {
     let mut offset = 0usize;
+    let bytes = frontmatter.as_bytes();
+
     for line in frontmatter.lines() {
         let trimmed = line.trim_start();
         if trimmed.starts_with('#') || trimmed.is_empty() {
-            offset += line.len() + 1;
+            // Calculate actual byte length including newline characters
+            let line_end = offset + line.len();
+            // Check for CRLF or LF
+            if line_end < bytes.len() {
+                if bytes[line_end] == b'\n' {
+                    offset = line_end + 1; // LF
+                } else if line_end + 1 < bytes.len()
+                    && bytes[line_end] == b'\r'
+                    && bytes[line_end + 1] == b'\n'
+                {
+                    offset = line_end + 2; // CRLF
+                } else {
+                    offset = line_end; // No newline (last line)
+                }
+            } else {
+                offset = line_end; // End of string
+            }
             continue;
         }
         if let Some(rest) = trimmed.strip_prefix(key) {
@@ -854,7 +959,125 @@ fn frontmatter_key_offset(frontmatter: &str, key: &str) -> Option<usize> {
                 return Some(offset + column);
             }
         }
-        offset += line.len() + 1;
+        // Calculate actual byte length including newline characters
+        let line_end = offset + line.len();
+        if line_end < bytes.len() {
+            if bytes[line_end] == b'\n' {
+                offset = line_end + 1; // LF
+            } else if line_end + 1 < bytes.len()
+                && bytes[line_end] == b'\r'
+                && bytes[line_end + 1] == b'\n'
+            {
+                offset = line_end + 2; // CRLF
+            } else {
+                offset = line_end; // No newline (last line)
+            }
+        } else {
+            offset = line_end; // End of string
+        }
+    }
+    None
+}
+
+/// Find the byte range of a YAML value for a given key in frontmatter.
+/// Returns (start, end) byte offsets relative to the full content.
+/// Handles both quoted and unquoted values.
+fn frontmatter_value_byte_range(
+    _content: &str,
+    parts: &FrontmatterParts,
+    key: &str,
+) -> Option<(usize, usize)> {
+    let frontmatter = &parts.frontmatter;
+    let mut offset = 0usize;
+    let bytes = frontmatter.as_bytes();
+
+    for line in frontmatter.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            // Calculate actual byte length including newline characters
+            let line_end = offset + line.len();
+            if line_end < bytes.len() {
+                if bytes[line_end] == b'\n' {
+                    offset = line_end + 1; // LF
+                } else if line_end + 1 < bytes.len()
+                    && bytes[line_end] == b'\r'
+                    && bytes[line_end + 1] == b'\n'
+                {
+                    offset = line_end + 2; // CRLF
+                } else {
+                    offset = line_end; // No newline (last line)
+                }
+            } else {
+                offset = line_end; // End of string
+            }
+            continue;
+        }
+
+        if let Some(rest) = trimmed.strip_prefix(key) {
+            if let Some(after_colon) = rest.trim_start().strip_prefix(':') {
+                // Found the key, now find the value
+                let leading_ws = line.len() - trimmed.len();
+                let ws_after_key = rest.len() - rest.trim_start().len();
+                let key_end = leading_ws + key.len() + ws_after_key + 1; // +1 for ':'
+
+                let value_str = after_colon.trim_start();
+                if value_str.is_empty() {
+                    // No value on this line (might be multiline YAML)
+                    return None;
+                }
+
+                // Calculate value start position in line
+                let value_offset_in_line = key_end + (after_colon.len() - value_str.len());
+
+                // Handle quoted values
+                let (value_start, value_len) = if let Some(inner) = value_str.strip_prefix('"') {
+                    // Double-quoted: find closing quote
+                    if let Some(end_quote) = inner.find('"') {
+                        (value_offset_in_line + 1, end_quote) // Skip opening quote
+                    } else {
+                        // Unclosed quote - return None for malformed YAML
+                        return None;
+                    }
+                } else if let Some(inner) = value_str.strip_prefix('\'') {
+                    // Single-quoted: find closing quote
+                    if let Some(end_quote) = inner.find('\'') {
+                        (value_offset_in_line + 1, end_quote) // Skip opening quote
+                    } else {
+                        // Unclosed quote - return None for malformed YAML
+                        return None;
+                    }
+                } else {
+                    // Unquoted value: take until end of line or comment
+                    // Check for both " #" (space-hash) and "\t#" (tab-hash)
+                    let value_end = value_str
+                        .find(" #")
+                        .or_else(|| value_str.find("\t#"))
+                        .unwrap_or(value_str.len());
+                    (value_offset_in_line, value_end)
+                };
+
+                let abs_start = parts.frontmatter_start + offset + value_start;
+                let abs_end = abs_start + value_len;
+
+                return Some((abs_start, abs_end));
+            }
+        }
+        // Calculate actual byte length including newline characters
+        let line_end = offset + line.len();
+        if line_end < bytes.len() {
+            if bytes[line_end] == b'\n' {
+                offset = line_end + 1; // LF
+            } else if line_end + 1 < bytes.len()
+                && bytes[line_end] == b'\r'
+                && bytes[line_end + 1] == b'\n'
+            {
+                offset = line_end + 2; // CRLF
+            } else {
+                offset = line_end; // No newline (last line)
+            }
+        } else {
+            offset = line_end; // End of string
+        }
     }
     None
 }
@@ -2430,5 +2653,340 @@ Body"#;
             .filter(|d| d.rule == "CC-SK-006")
             .collect();
         assert_eq!(cc_sk_006.len(), 1);
+    }
+
+    // ===== convert_to_kebab_case Tests =====
+
+    #[test]
+    fn test_convert_to_kebab_case_lowercase() {
+        assert_eq!(convert_to_kebab_case("TestSkill"), "testskill");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_underscores() {
+        assert_eq!(convert_to_kebab_case("test_skill"), "test-skill");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_mixed() {
+        assert_eq!(convert_to_kebab_case("Test_Skill_Name"), "test-skill-name");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_consecutive_hyphens() {
+        assert_eq!(convert_to_kebab_case("test--skill"), "test-skill");
+        assert_eq!(convert_to_kebab_case("test___skill"), "test-skill");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_leading_trailing() {
+        assert_eq!(convert_to_kebab_case("-test-skill-"), "test-skill");
+        assert_eq!(convert_to_kebab_case("_test_skill_"), "test-skill");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_invalid_chars() {
+        assert_eq!(convert_to_kebab_case("test@skill!"), "testskill");
+        assert_eq!(convert_to_kebab_case("test.skill"), "testskill");
+    }
+
+    #[test]
+    fn test_convert_to_kebab_case_truncate() {
+        let long_name = "a".repeat(100);
+        let result = convert_to_kebab_case(&long_name);
+        assert!(result.len() <= 64);
+        assert_eq!(result.len(), 64);
+    }
+
+    // ===== AS-004 Auto-fix Tests =====
+
+    #[test]
+    fn test_as_004_has_fix() {
+        let content = r#"---
+name: Test_Skill
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+        assert_eq!(as_004[0].fixes[0].replacement, "test-skill");
+    }
+
+    #[test]
+    fn test_as_004_fix_case_only_is_safe() {
+        let content = r#"---
+name: TestSkill
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+        // Case-only change (TestSkill -> testskill) is safe
+        assert!(as_004[0].fixes[0].safe);
+    }
+
+    #[test]
+    fn test_as_004_fix_structural_is_unsafe() {
+        let content = r#"---
+name: Test_Skill
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+        // Structural change (Test_Skill -> test-skill) is not safe
+        assert!(!as_004[0].fixes[0].safe);
+    }
+
+    #[test]
+    fn test_as_004_fix_byte_position() {
+        let content = r#"---
+name: Bad_Name
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+
+        let fix = &as_004[0].fixes[0];
+        // Apply fix and verify
+        let mut fixed = content.to_string();
+        fixed.replace_range(fix.start_byte..fix.end_byte, &fix.replacement);
+        assert!(fixed.contains("name: bad-name"));
+    }
+
+    #[test]
+    fn test_as_004_fix_quoted_value() {
+        let content = r#"---
+name: "Bad_Name"
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+
+        let fix = &as_004[0].fixes[0];
+        // Apply fix and verify
+        let mut fixed = content.to_string();
+        fixed.replace_range(fix.start_byte..fix.end_byte, &fix.replacement);
+        // The fix replaces the inner value, keeping quotes in place
+        assert!(fixed.contains("bad-name"));
+    }
+
+    #[test]
+    fn test_as_004_no_fix_when_converts_to_empty() {
+        // Name with only special characters should convert to empty string
+        let content = r#"---
+name: "!@#$%"
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        // Should have no fix since converted name would be empty
+        assert!(!as_004[0].has_fixes());
+    }
+
+    #[test]
+    fn test_as_004_underscore_to_hyphen_is_unsafe() {
+        // Test_Name -> test-name involves underscore replacement, should be unsafe
+        let content = r#"---
+name: test_name
+description: Use when testing
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_004: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-004").collect();
+        assert_eq!(as_004.len(), 1);
+        assert!(as_004[0].has_fixes());
+        // Underscore to hyphen is structural change, not safe
+        assert!(!as_004[0].fixes[0].safe);
+    }
+
+    // ===== AS-010 Auto-fix Tests =====
+
+    #[test]
+    fn test_as_010_has_fix() {
+        let content = r#"---
+name: code-review
+description: Reviews code for quality
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_010: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
+        assert_eq!(as_010.len(), 1);
+        assert!(as_010[0].has_fixes());
+        assert_eq!(
+            as_010[0].fixes[0].replacement,
+            "Use when user wants to Reviews code for quality"
+        );
+    }
+
+    #[test]
+    fn test_as_010_fix_is_unsafe() {
+        let content = r#"---
+name: code-review
+description: Reviews code for quality
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_010: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
+        assert_eq!(as_010.len(), 1);
+        assert!(as_010[0].has_fixes());
+        // Semantic change is not safe
+        assert!(!as_010[0].fixes[0].safe);
+    }
+
+    #[test]
+    fn test_as_010_fix_byte_position() {
+        let content = r#"---
+name: helper
+description: Helps with tasks
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_010: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
+        assert_eq!(as_010.len(), 1);
+        assert!(as_010[0].has_fixes());
+
+        let fix = &as_010[0].fixes[0];
+        // Apply fix and verify
+        let mut fixed = content.to_string();
+        fixed.replace_range(fix.start_byte..fix.end_byte, &fix.replacement);
+        assert!(fixed.contains("Use when user wants to Helps with tasks"));
+    }
+
+    #[test]
+    fn test_as_010_fix_quoted_value() {
+        let content = r#"---
+name: helper
+description: "Helps with tasks"
+---
+Body"#;
+
+        let validator = SkillValidator;
+        let diagnostics = validator.validate(Path::new("test.md"), content, &LintConfig::default());
+
+        let as_010: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
+        assert_eq!(as_010.len(), 1);
+        assert!(as_010[0].has_fixes());
+
+        let fix = &as_010[0].fixes[0];
+        // Apply fix and verify
+        let mut fixed = content.to_string();
+        fixed.replace_range(fix.start_byte..fix.end_byte, &fix.replacement);
+        assert!(fixed.contains("Use when user wants to Helps with tasks"));
+    }
+
+    #[test]
+    fn test_as_010_no_fix_when_description_too_long() {
+        // Create a description that would exceed 1024 chars when prepending trigger phrase
+        let long_desc = "a".repeat(1010);
+        let content = format!("---\nname: helper\ndescription: {}\n---\nBody", long_desc);
+
+        let validator = SkillValidator;
+        let diagnostics =
+            validator.validate(Path::new("test.md"), &content, &LintConfig::default());
+
+        let as_010: Vec<_> = diagnostics.iter().filter(|d| d.rule == "AS-010").collect();
+        assert_eq!(as_010.len(), 1);
+        // Should have no fix since prepending would exceed limit
+        assert!(!as_010[0].has_fixes());
+    }
+
+    // ===== frontmatter_value_byte_range Tests =====
+
+    #[test]
+    fn test_frontmatter_value_byte_range_unquoted() {
+        let content = r#"---
+name: test-skill
+description: A test skill
+---
+Body"#;
+        let parts = split_frontmatter(content);
+        let range = frontmatter_value_byte_range(content, &parts, "name");
+        assert!(range.is_some());
+        let (start, end) = range.unwrap();
+        assert_eq!(&content[start..end], "test-skill");
+    }
+
+    #[test]
+    fn test_frontmatter_value_byte_range_double_quoted() {
+        let content = r#"---
+name: "test-skill"
+description: A test skill
+---
+Body"#;
+        let parts = split_frontmatter(content);
+        let range = frontmatter_value_byte_range(content, &parts, "name");
+        assert!(range.is_some());
+        let (start, end) = range.unwrap();
+        assert_eq!(&content[start..end], "test-skill");
+    }
+
+    #[test]
+    fn test_frontmatter_value_byte_range_single_quoted() {
+        let content = r#"---
+name: 'test-skill'
+description: A test skill
+---
+Body"#;
+        let parts = split_frontmatter(content);
+        let range = frontmatter_value_byte_range(content, &parts, "name");
+        assert!(range.is_some());
+        let (start, end) = range.unwrap();
+        assert_eq!(&content[start..end], "test-skill");
+    }
+
+    #[test]
+    fn test_frontmatter_value_byte_range_not_found() {
+        let content = r#"---
+name: test-skill
+---
+Body"#;
+        let parts = split_frontmatter(content);
+        let range = frontmatter_value_byte_range(content, &parts, "description");
+        assert!(range.is_none());
     }
 }
