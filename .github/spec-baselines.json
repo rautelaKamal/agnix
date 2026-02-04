@@ -1,58 +1,58 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Baseline content hashes for spec-drift sentinel. Updated automatically by workflow.",
-  "last_updated": "2026-02-04T00:00:00Z",
+  "last_updated": "2026-02-04T17:10:08Z",
   "sources": {
     "s-tier": {
       "agent-skills-spec": {
         "url": "https://agentskills.io/specification",
-        "hash": ""
+        "hash": "07eb3bfba81db490030345a8c7bfed3683207205dae290300318279c30106de2"
       },
       "mcp-spec": {
         "url": "https://modelcontextprotocol.io/specification/2025-11-25",
-        "hash": ""
+        "hash": "45eed48714317ebca887c021e5a2a46f56b0dabbae14c399dcccd73100358934"
       },
       "claude-code-memory": {
         "url": "https://code.claude.com/docs/en/memory",
-        "hash": ""
+        "hash": "afcbf2219b2f9f72f3d8932ef5049278833627a09b2fd2955406e82b9ae312e2"
       },
       "claude-code-hooks": {
         "url": "https://code.claude.com/docs/en/hooks",
-        "hash": ""
+        "hash": "404c38e161c8b9cf8daabd455776ae078a0dc29314cbaa682e0a17c2ce24ac1a"
       },
       "claude-code-skills": {
         "url": "https://code.claude.com/docs/en/skills",
-        "hash": ""
+        "hash": "aa304d51b31be37a59f35e81c315e9b298894508857295c71a6b56e7a25c8cd9"
       },
       "claude-code-plugins": {
         "url": "https://code.claude.com/docs/en/plugins-reference",
-        "hash": ""
+        "hash": "af4d216303304bf0ffd1de74a9a1f71ffb0e44d5323306a80a30cf89bbbcb769"
       },
       "claude-code-subagents": {
         "url": "https://code.claude.com/docs/en/sub-agents",
-        "hash": ""
+        "hash": "b17ed99452ce65f18804fff1ed945414d9e42ae862d295ad49be6b13dd93210c"
       },
       "codex-cli-agents-md": {
         "url": "https://developers.openai.com/codex/guides/agents-md/",
-        "hash": ""
+        "hash": "7ff43344ded3bb80b7c8f3dc37f40dec948a331719c1c7a0125384338f87c15c"
       },
       "opencode-rules": {
         "url": "https://opencode.ai/docs/rules/",
-        "hash": ""
+        "hash": "622315eb04b6dacc551537a4298b02cef15078e2b041cc79945cefce7e607c4a"
       }
     },
     "a-tier": {
       "cursor-rules": {
         "url": "https://cursor.com/docs/context/rules",
-        "hash": ""
+        "hash": "24529507938b37d3e3815e86b8c1c87cbaf78230c899854f0d74b2d5356c676a"
       },
       "github-copilot": {
         "url": "https://docs.github.com/en/copilot/customizing-copilot",
-        "hash": ""
+        "hash": "668c75acb7948484e1334aeb040332961836fbe187561fa830219afcde8ae289"
       },
       "cline-rules": {
         "url": "https://docs.cline.bot/features/cline-rules/overview",
-        "hash": ""
+        "hash": "3a42acacd88e62655c440c04214bed9e622793007489f1d9ef68a2ea85360063"
       }
     }
   }
