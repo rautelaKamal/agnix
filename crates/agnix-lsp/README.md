@@ -30,7 +30,7 @@ agnix-lsp
 
 ### VS Code
 
-A dedicated VS Code extension is planned. For now, you can use a generic LSP client extension.
+A dedicated VS Code extension is available at `editors/vscode`. See `editors/vscode/README.md` for installation and usage.
 
 ### Neovim (with nvim-lspconfig)
 
