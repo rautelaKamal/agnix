@@ -146,7 +146,7 @@ case "${EXT}" in
         tar -xzf "${TEMP_DIR}/${ARTIFACT_NAME}" -C "${BIN_DIR}"
         ;;
     zip)
-        unzip -q "${TEMP_DIR}/${ARTIFACT_NAME}" -d "${BIN_DIR}"
+        unzip -q -o "${TEMP_DIR}/${ARTIFACT_NAME}" -d "${BIN_DIR}"
         ;;
 esac
 
