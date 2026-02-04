@@ -1774,8 +1774,7 @@ fn test_fix_safe_skips_structural_as_004() {
     fs::create_dir_all(&skills_dir).unwrap();
 
     let skill_path = skills_dir.join("SKILL.md");
-    let original_content =
-        "---\nname: test_skill_name\ndescription: Use when testing\n---\nBody";
+    let original_content = "---\nname: test_skill_name\ndescription: Use when testing\n---\nBody";
     {
         let mut file = fs::File::create(&skill_path).unwrap();
         // Name with underscores = structural change (not just case)

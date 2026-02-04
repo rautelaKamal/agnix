@@ -988,31 +988,30 @@ fn frontmatter_value_byte_range(
                 let value_offset_in_line = key_end + (after_colon.len() - value_str.len());
 
                 // Handle quoted values
-                let (value_start, value_len) =
-                    if let Some(inner) = value_str.strip_prefix('"') {
-                        // Double-quoted: find closing quote
-                        if let Some(end_quote) = inner.find('"') {
-                            (value_offset_in_line + 1, end_quote) // Skip opening quote
-                        } else {
-                            // Unclosed quote, take whole value
-                            (value_offset_in_line, value_str.len())
-                        }
-                    } else if let Some(inner) = value_str.strip_prefix('\'') {
-                        // Single-quoted: find closing quote
-                        if let Some(end_quote) = inner.find('\'') {
-                            (value_offset_in_line + 1, end_quote) // Skip opening quote
-                        } else {
-                            // Unclosed quote, take whole value
-                            (value_offset_in_line, value_str.len())
-                        }
+                let (value_start, value_len) = if let Some(inner) = value_str.strip_prefix('"') {
+                    // Double-quoted: find closing quote
+                    if let Some(end_quote) = inner.find('"') {
+                        (value_offset_in_line + 1, end_quote) // Skip opening quote
                     } else {
-                        // Unquoted value: take until end of line or comment
-                        let value_end = value_str
-                            .find(" #")
-                            .unwrap_or(value_str.len())
-                            .min(value_str.len());
-                        (value_offset_in_line, value_end)
-                    };
+                        // Unclosed quote, take whole value
+                        (value_offset_in_line, value_str.len())
+                    }
+                } else if let Some(inner) = value_str.strip_prefix('\'') {
+                    // Single-quoted: find closing quote
+                    if let Some(end_quote) = inner.find('\'') {
+                        (value_offset_in_line + 1, end_quote) // Skip opening quote
+                    } else {
+                        // Unclosed quote, take whole value
+                        (value_offset_in_line, value_str.len())
+                    }
+                } else {
+                    // Unquoted value: take until end of line or comment
+                    let value_end = value_str
+                        .find(" #")
+                        .unwrap_or(value_str.len())
+                        .min(value_str.len());
+                    (value_offset_in_line, value_end)
+                };
 
                 let abs_start = parts.frontmatter_start + offset + value_start;
                 let abs_end = abs_start + value_len;
@@ -2866,10 +2865,7 @@ Body"#;
     fn test_as_010_no_fix_when_description_too_long() {
         // Create a description that would exceed 1024 chars when prepending trigger phrase
         let long_desc = "a".repeat(1010);
-        let content = format!(
-            "---\nname: helper\ndescription: {}\n---\nBody",
-            long_desc
-        );
+        let content = format!("---\nname: helper\ndescription: {}\n---\nBody", long_desc);
 
         let validator = SkillValidator;
         let diagnostics =
