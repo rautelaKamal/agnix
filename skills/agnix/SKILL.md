@@ -1,33 +1,24 @@
 ---
 name: agnix
-triggers:
-  - /agnix
-  - /validate-config
-  - /lint-agents
-description: Use when validating agent config files (SKILL.md, CLAUDE.md, AGENTS.md, hooks, MCP, plugins). Catches issues before they break your workflow.
-tools:
-  - Bash(agnix:*)
-  - Bash(cargo:*)
-  - Read
-  - Glob
-  - Grep
+description: "Use when user asks to 'lint agent configs', 'validate skills', 'check CLAUDE.md', 'validate hooks', 'lint MCP'. Validates agent configuration files against 100 rules."
+version: 1.0.0
+argument-hint: "[path] [--fix] [--strict]"
+allowed-tools: Bash(agnix:*), Bash(cargo:*), Read, Glob, Grep
 ---
 
-# agnix - Agent Config Linter
+# agnix
 
-Validate agent configurations before they break your workflow.
+Lint agent configurations before they break your workflow. Validates Skills, Hooks, MCP, Memory, Plugins across Claude Code, Cursor, GitHub Copilot, and Codex CLI.
 
-## Quick Reference
+## When to Use
 
-| Command | Description |
-|---------|-------------|
-| `agnix .` | Validate current project |
-| `agnix --fix .` | Auto-fix issues |
-| `agnix --strict .` | Treat warnings as errors |
-| `agnix --target claude-code .` | Only Claude Code rules |
-| `agnix --watch .` | Watch mode - re-validate on changes |
-| `agnix --format json .` | JSON output |
-| `agnix --format sarif .` | SARIF for GitHub Code Scanning |
+Invoke when user asks to:
+- "Lint my agent configs"
+- "Validate my skills"
+- "Check my CLAUDE.md"
+- "Validate hooks"
+- "Lint MCP configs"
+- "Fix agent configuration issues"
 
 ## Supported Files
 
@@ -40,9 +31,7 @@ Validate agent configurations before they break your workflow.
 | Cursor | `.cursor/rules/*.mdc` |
 | Copilot | `.github/copilot-instructions.md` |
 
-## Execution Steps
-
-When invoked, run these commands:
+## Execution
 
 ### 1. Check if agnix is installed
 
@@ -50,7 +39,7 @@ When invoked, run these commands:
 agnix --version
 ```
 
-If not installed, install with:
+If not found, install:
 ```bash
 cargo install agnix-cli
 ```
@@ -61,7 +50,7 @@ cargo install agnix-cli
 agnix .
 ```
 
-### 3. If issues found, try auto-fix
+### 3. If issues found and --fix requested
 
 ```bash
 agnix --fix .
@@ -73,35 +62,40 @@ agnix --fix .
 agnix .
 ```
 
+## CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `agnix .` | Validate current project |
+| `agnix --fix .` | Auto-fix issues |
+| `agnix --strict .` | Treat warnings as errors |
+| `agnix --target claude-code .` | Only Claude Code rules |
+| `agnix --target cursor .` | Only Cursor rules |
+| `agnix --watch .` | Watch mode |
+| `agnix --format json .` | JSON output |
+
 ## Output Format
 
 ```
 CLAUDE.md:15:1 warning: Generic instruction 'Be helpful' [fixable]
   help: Remove generic instructions. Claude already knows this.
 
-.claude/skills/review/SKILL.md:3:1 error: Invalid name [fixable]
+skills/review/SKILL.md:3:1 error: Invalid name [fixable]
   help: Use lowercase letters and hyphens only
 
 Found 1 error, 1 warning (2 fixable)
 ```
 
-## Common Fixes
+## Common Issues & Fixes
 
 | Issue | Solution |
 |-------|----------|
 | Invalid skill name | Use lowercase with hyphens: `my-skill` |
-| Generic instructions | Remove "be helpful", "be accurate" - Claude knows |
-| Missing trigger phrase | Add "Use when..." to skill description |
-| Duplicate rules | Remove redundant lines from CLAUDE.md |
-
-## Targets
-
-- `generic` - All rules (default)
-- `claude-code` - Claude Code specific
-- `cursor` - Cursor specific
-- `codex` - Codex CLI specific
+| Generic instructions | Remove "be helpful", "be accurate" |
+| Missing trigger phrase | Add "Use when..." to description |
+| Directory/name mismatch | Rename directory to match `name:` field |
 
 ## Links
 
+- [GitHub](https://github.com/avifenesh/agnix)
 - [Rules Reference](https://github.com/avifenesh/agnix/blob/main/knowledge-base/VALIDATION-RULES.md)
-- [Configuration](https://github.com/avifenesh/agnix/blob/main/docs/CONFIGURATION.md)

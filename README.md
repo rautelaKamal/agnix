@@ -55,7 +55,20 @@ cargo install agnix-cli
 
 # Pre-built binaries
 # Download from https://github.com/avifenesh/agnix/releases
+
+# Docker
+docker run --rm -v $(pwd):/workspace ghcr.io/avifenesh/agnix .
 ```
+
+## Claude Code Skill
+
+Use `/agnix` directly in Claude Code via [awesome-slash](https://github.com/avifenesh/awesome-slash) (300+ stars):
+
+```
+/install awesome-slash
+```
+
+Then run `/agnix` to validate your project, `/agnix fix` to auto-fix issues.
 
 ## Quick Start
 
