@@ -8,7 +8,7 @@ mod watch;
 use agnix_core::{
     apply_fixes,
     config::{LintConfig, TargetTool},
-    diagnostics::DiagnosticLevel,
+    diagnostics::{Diagnostic, DiagnosticLevel},
     eval::{evaluate_manifest_file, EvalFormat},
     generate_schema, validate_project, ValidationResult,
 };
@@ -232,6 +232,18 @@ fn main() {
     }
 }
 
+fn count_errors_warnings(diagnostics: &[Diagnostic]) -> (usize, usize) {
+    let errors = diagnostics
+        .iter()
+        .filter(|d| d.level == DiagnosticLevel::Error)
+        .count();
+    let warnings = diagnostics
+        .iter()
+        .filter(|d| d.level == DiagnosticLevel::Warning)
+        .count();
+    (errors, warnings)
+}
+
 #[tracing::instrument(skip(cli), fields(path = %path.display()))]
 fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
     tracing::debug!("Starting validation");
@@ -385,14 +397,7 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let errors = diagnostics
-        .iter()
-        .filter(|d| d.level == DiagnosticLevel::Error)
-        .count();
-    let warnings = diagnostics
-        .iter()
-        .filter(|d| d.level == DiagnosticLevel::Warning)
-        .count();
+    let (errors, warnings) = count_errors_warnings(&diagnostics);
     let infos = diagnostics
         .iter()
         .filter(|d| d.level == DiagnosticLevel::Info)
@@ -513,14 +518,7 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
                 files_checked: _,
             } = validate_project(path, &config)?;
 
-            final_errors = post_fix_diagnostics
-                .iter()
-                .filter(|d| d.level == DiagnosticLevel::Error)
-                .count();
-            final_warnings = post_fix_diagnostics
-                .iter()
-                .filter(|d| d.level == DiagnosticLevel::Warning)
-                .count();
+            (final_errors, final_warnings) = count_errors_warnings(&post_fix_diagnostics);
         }
     } else if fixable > 0 {
         println!();
