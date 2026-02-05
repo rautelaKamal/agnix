@@ -12,11 +12,11 @@
 
 ## Critical Rules
 
-1. **Rust workspace** - agnix-core (lib) + agnix-cli (binary)
+1. **Rust workspace** - agnix-rules (data), agnix-core (lib), agnix-cli/agnix-lsp/agnix-mcp (binaries)
 2. **rules.json is source of truth** - `knowledge-base/rules.json` is the machine-readable source of truth. When adding a new rule, add it to BOTH `rules.json` AND `VALIDATION-RULES.md`. CI parity tests enforce this.
 3. **Plain text output** - No emojis, no ASCII art
 4. **Certainty filtering** - HIGH (>95%), MEDIUM (75-95%), LOW (<75%)
-5. **Single binary** - Compile with LTO, strip symbols,
+5. **Release binaries** - Compile with LTO, strip symbols
 6. **Track work in GitHub issues** - All tasks tracked there
 7. **Task is not done until tests added** - Every feature/fix must have quality tests
 8. **Documentation** - Keep long-form docs in `README.md`, `SPEC.md`, and `knowledge-base/` (especially `knowledge-base/VALIDATION-RULES.md`). Keep `CLAUDE.md`/`AGENTS.md` for agent instructions only.
@@ -24,6 +24,7 @@
 10. **No unnecessary files** - Don't create summary files, plan files, or temp docs unless specifically required
 11. **Never merge without waiting for claude workflow to end successfully** - It might take time, but this is the major quality gate, and most thorough review.
 12. **You MUST follow the flow phases one by one** - If they state to use subagents, tools, or any specific method, you must follow it exactly as described.
+13. **You MUST address all comments and reviews** - If reviewers leave comments, even minor ones, and even if not a requested change, you must address them all before merging. If you disagree, respond in the review comments. Minor comments must still be addressed.
 
 ## Architecture
 
@@ -35,7 +36,8 @@ agnix-rules (data-only, generated from rules.json)
 agnix-core (validation engine)
     ↓
 ├── agnix-cli (command-line interface)
-└── agnix-lsp (language server protocol)
+├── agnix-lsp (language server protocol)
+└── agnix-mcp (MCP server)
 ```
 
 ### Project Layout
@@ -45,7 +47,8 @@ crates/
 ├── agnix-rules/    # Rule definitions (build-time generated)
 ├── agnix-core/     # Core: parsers, schemas, validators, diagnostics
 ├── agnix-cli/      # CLI binary (clap)
-└── agnix-lsp/      # LSP server (tower-lsp, tokio)
+├── agnix-lsp/      # LSP server (tower-lsp, tokio)
+└── agnix-mcp/      # MCP server (rmcp)
 editors/
 └── vscode/         # VS Code extension
 knowledge-base/     # 100 rules, 75+ sources, rules.json
@@ -114,8 +117,10 @@ pub struct Backend {
 ```bash
 cargo check                 # Compile check
 cargo test                  # Run tests
-cargo build --release       # Build binary
+cargo build --release       # Build binaries
 cargo run --bin agnix -- .  # Run CLI
+cargo run --bin agnix-lsp   # Run LSP server
+cargo run --bin agnix-mcp   # Run MCP server
 ```
 
 ## Rules Reference
@@ -130,10 +135,10 @@ Format: `[CATEGORY]-[NUMBER]` (AS-004, CC-HK-001, etc.)
 
 ## Current State
 
-- v0.2.0 - Production-ready with full validation pipeline
+- v0.7.2 - Production-ready with full validation pipeline
 - 100 validation rules across 13 validators
 - 1500+ passing tests
-- LSP server with VS Code extension
+- LSP + MCP servers with VS Code extension
 - See GitHub issues for roadmap
 
 ## Top tier tools support:
