@@ -3399,4 +3399,115 @@ Use idiomatic Rust patterns.
             "files_checked should only count recognized file types"
         );
     }
+
+    // ===== Concurrent Access Tests =====
+
+    #[test]
+    fn test_validator_registry_concurrent_access() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let registry = Arc::new(ValidatorRegistry::with_defaults());
+
+        let handles: Vec<_> = (0..10)
+            .map(|_| {
+                let registry = Arc::clone(&registry);
+                thread::spawn(move || {
+                    // Multiple threads accessing validators_for concurrently
+                    for _ in 0..100 {
+                        let _ = registry.validators_for(FileType::Skill);
+                        let _ = registry.validators_for(FileType::ClaudeMd);
+                        let _ = registry.validators_for(FileType::Mcp);
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle.join().expect("Thread panicked");
+        }
+    }
+
+    #[test]
+    fn test_concurrent_file_validation() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Create multiple files
+        for i in 0..5 {
+            let skill_dir = temp.path().join(format!("skill-{}", i));
+            std::fs::create_dir_all(&skill_dir).unwrap();
+            std::fs::write(
+                skill_dir.join("SKILL.md"),
+                format!(
+                    "---\nname: skill-{}\ndescription: Skill number {}\n---\nBody",
+                    i, i
+                ),
+            )
+            .unwrap();
+        }
+
+        let config = Arc::new(LintConfig::default());
+        let registry = Arc::new(ValidatorRegistry::with_defaults());
+        let temp_path = temp.path().to_path_buf();
+
+        let handles: Vec<_> = (0..5)
+            .map(|i| {
+                let config = Arc::clone(&config);
+                let registry = Arc::clone(&registry);
+                let path = temp_path.join(format!("skill-{}", i)).join("SKILL.md");
+                thread::spawn(move || validate_file_with_registry(&path, &config, &registry))
+            })
+            .collect();
+
+        for handle in handles {
+            let result = handle.join().expect("Thread panicked");
+            assert!(result.is_ok(), "Concurrent validation should succeed");
+        }
+    }
+
+    #[test]
+    fn test_concurrent_project_validation() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let temp = tempfile::TempDir::new().unwrap();
+
+        // Create a project structure
+        std::fs::write(
+            temp.path().join("SKILL.md"),
+            "---\nname: test-skill\ndescription: Test description\n---\nBody",
+        )
+        .unwrap();
+        std::fs::write(temp.path().join("CLAUDE.md"), "# Project memory").unwrap();
+
+        let config = Arc::new(LintConfig::default());
+        let temp_path = temp.path().to_path_buf();
+
+        // Run multiple validate_project calls concurrently
+        let handles: Vec<_> = (0..5)
+            .map(|_| {
+                let config = Arc::clone(&config);
+                let path = temp_path.clone();
+                thread::spawn(move || validate_project(&path, &config))
+            })
+            .collect();
+
+        let mut results: Vec<_> = handles
+            .into_iter()
+            .map(|h| h.join().expect("Thread panicked").expect("Validation failed"))
+            .collect();
+
+        // All results should be identical
+        let first = results.pop().unwrap();
+        for result in results {
+            assert_eq!(
+                first.diagnostics.len(),
+                result.diagnostics.len(),
+                "Concurrent validations should produce identical results"
+            );
+        }
+    }
 }

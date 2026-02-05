@@ -153,6 +153,26 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
+    // Initialize tracing for verbose mode (only for text output to avoid corrupting JSON/SARIF)
+    if cli.verbose && matches!(cli.format, OutputFormat::Text) {
+        use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+        let filter = EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| EnvFilter::new("agnix=debug,agnix_core=debug"));
+
+        tracing_subscriber::registry()
+            .with(
+                fmt::layer()
+                    .with_target(true)
+                    .with_level(true)
+                    .with_writer(std::io::stderr),
+            )
+            .with(filter)
+            .init();
+
+        tracing::debug!("Verbose mode enabled");
+    }
+
     let result = match &cli.command {
         Some(Commands::Validate { path }) => validate_command(path, &cli),
         Some(Commands::Init { output }) => init_command(output),
@@ -171,8 +191,13 @@ fn main() {
     }
 }
 
+#[tracing::instrument(skip(cli), fields(path = %path.display()))]
 fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
+    tracing::debug!("Starting validation");
+
     let config_path = resolve_config_path(path, cli);
+    tracing::debug!(config_path = ?config_path, "Resolved config path");
+
     let (mut config, config_warning) = LintConfig::load_or_default(config_path.as_ref());
 
     // Display config warning before validation output
@@ -196,6 +221,12 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
         diagnostics,
         files_checked,
     } = validate_project(path, &config)?;
+
+    tracing::debug!(
+        files_checked = files_checked,
+        diagnostics_count = diagnostics.len(),
+        "Validation complete"
+    );
 
     // Handle JSON output format
     if matches!(cli.format, OutputFormat::Json) {

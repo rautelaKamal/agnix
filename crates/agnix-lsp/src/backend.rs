@@ -1042,4 +1042,230 @@ This is a test project.
                 .await;
         }
     }
+
+    // ===== Cache Invalidation Tests =====
+
+    /// Test that document cache is cleared when document is closed.
+    #[tokio::test]
+    async fn test_document_cache_cleared_on_close() {
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        std::fs::write(
+            &skill_path,
+            "---\nname: test\ndescription: Test\n---\n# Test",
+        )
+        .unwrap();
+
+        let uri = Url::from_file_path(&skill_path).unwrap();
+
+        // Open document
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: "---\nname: test\ndescription: Test\n---\n# Test".to_string(),
+                },
+            })
+            .await;
+
+        // Verify document is cached (hover should work)
+        let hover_before = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri.clone() },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+        assert!(hover_before.is_ok());
+        assert!(hover_before.unwrap().is_some());
+
+        // Close document
+        service
+            .inner()
+            .did_close(DidCloseTextDocumentParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+            })
+            .await;
+
+        // Verify document cache is cleared (hover should return None)
+        let hover_after = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+        assert!(hover_after.is_ok());
+        assert!(hover_after.unwrap().is_none());
+    }
+
+    /// Test that document cache is updated on change.
+    #[tokio::test]
+    async fn test_document_cache_updated_on_change() {
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        std::fs::write(&skill_path, "# Initial").unwrap();
+
+        let uri = Url::from_file_path(&skill_path).unwrap();
+
+        // Open with initial content
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: "# Initial".to_string(),
+                },
+            })
+            .await;
+
+        // Change to content with frontmatter
+        service
+            .inner()
+            .did_change(DidChangeTextDocumentParams {
+                text_document: VersionedTextDocumentIdentifier {
+                    uri: uri.clone(),
+                    version: 2,
+                },
+                content_changes: vec![TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: "---\nname: updated\ndescription: Updated\n---\n# Updated".to_string(),
+                }],
+            })
+            .await;
+
+        // Verify cache has new content (hover should work on frontmatter)
+        let hover = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+        assert!(hover.is_ok());
+        assert!(hover.unwrap().is_some());
+    }
+
+    /// Test that multiple documents have independent caches.
+    #[tokio::test]
+    async fn test_multiple_documents_independent_caches() {
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create two skill files
+        let skill1_path = temp_dir.path().join("skill1").join("SKILL.md");
+        let skill2_path = temp_dir.path().join("skill2").join("SKILL.md");
+        std::fs::create_dir_all(skill1_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(skill2_path.parent().unwrap()).unwrap();
+
+        std::fs::write(
+            &skill1_path,
+            "---\nname: skill-one\ndescription: First\n---\n# One",
+        )
+        .unwrap();
+        std::fs::write(
+            &skill2_path,
+            "---\nname: skill-two\ndescription: Second\n---\n# Two",
+        )
+        .unwrap();
+
+        let uri1 = Url::from_file_path(&skill1_path).unwrap();
+        let uri2 = Url::from_file_path(&skill2_path).unwrap();
+
+        // Open both documents
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri1.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: "---\nname: skill-one\ndescription: First\n---\n# One".to_string(),
+                },
+            })
+            .await;
+
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri2.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: "---\nname: skill-two\ndescription: Second\n---\n# Two".to_string(),
+                },
+            })
+            .await;
+
+        // Close first document
+        service
+            .inner()
+            .did_close(DidCloseTextDocumentParams {
+                text_document: TextDocumentIdentifier { uri: uri1.clone() },
+            })
+            .await;
+
+        // First document should be cleared
+        let hover1 = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri1 },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+        assert!(hover1.is_ok());
+        assert!(hover1.unwrap().is_none());
+
+        // Second document should still be cached
+        let hover2 = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: uri2 },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+        assert!(hover2.is_ok());
+        assert!(hover2.unwrap().is_some());
+    }
 }

@@ -824,4 +824,191 @@ unknownfield: value
             _ => panic!("Expected hover capability"),
         }
     }
+
+    #[tokio::test]
+    async fn test_rapid_document_changes() {
+        // Test that rapid document changes don't cause issues
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+        std::fs::write(&skill_path, "# Initial").unwrap();
+
+        let uri = Url::from_file_path(&skill_path).unwrap();
+
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: "# Initial".to_string(),
+                },
+            })
+            .await;
+
+        // Rapid-fire changes
+        for i in 2..=10 {
+            service
+                .inner()
+                .did_change(DidChangeTextDocumentParams {
+                    text_document: VersionedTextDocumentIdentifier {
+                        uri: uri.clone(),
+                        version: i,
+                    },
+                    content_changes: vec![TextDocumentContentChangeEvent {
+                        range: None,
+                        range_length: None,
+                        text: format!(
+                            "---\nname: skill-{}\ndescription: Version {}\n---\n# Skill",
+                            i, i
+                        ),
+                    }],
+                })
+                .await;
+        }
+
+        // Final state should be accessible
+        let hover = service
+            .inner()
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri },
+                    position: Position {
+                        line: 1,
+                        character: 0,
+                    },
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            })
+            .await;
+
+        assert!(hover.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_multiple_documents_concurrent() {
+        // Test handling multiple documents simultaneously
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+
+        // Create and open multiple documents
+        let mut uris = Vec::new();
+        for i in 0..5 {
+            let skill_dir = temp_dir.path().join(format!("skill-{}", i));
+            std::fs::create_dir_all(&skill_dir).unwrap();
+            let skill_path = skill_dir.join("SKILL.md");
+            std::fs::write(
+                &skill_path,
+                format!(
+                    "---\nname: skill-{}\ndescription: Test skill {}\n---\n# Skill {}",
+                    i, i, i
+                ),
+            )
+            .unwrap();
+
+            let uri = Url::from_file_path(&skill_path).unwrap();
+            uris.push(uri.clone());
+
+            service
+                .inner()
+                .did_open(DidOpenTextDocumentParams {
+                    text_document: TextDocumentItem {
+                        uri,
+                        language_id: "markdown".to_string(),
+                        version: 1,
+                        text: format!(
+                            "---\nname: skill-{}\ndescription: Test skill {}\n---\n# Skill {}",
+                            i, i, i
+                        ),
+                    },
+                })
+                .await;
+        }
+
+        // Query hover on all documents
+        for uri in &uris {
+            let hover = service
+                .inner()
+                .hover(HoverParams {
+                    text_document_position_params: TextDocumentPositionParams {
+                        text_document: TextDocumentIdentifier { uri: uri.clone() },
+                        position: Position {
+                            line: 1,
+                            character: 0,
+                        },
+                    },
+                    work_done_progress_params: WorkDoneProgressParams::default(),
+                })
+                .await;
+
+            assert!(hover.is_ok());
+        }
+
+        // Close all documents
+        for uri in uris {
+            service
+                .inner()
+                .did_close(DidCloseTextDocumentParams {
+                    text_document: TextDocumentIdentifier { uri },
+                })
+                .await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_code_action_with_fix_available() {
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let skill_path = temp_dir.path().join("SKILL.md");
+
+        // Create skill with trailing whitespace (AS-001 provides fix)
+        let content = "---\nname: test-skill\ndescription: Test   \n---\n# Test";
+        std::fs::write(&skill_path, content).unwrap();
+
+        let uri = Url::from_file_path(&skill_path).unwrap();
+
+        service
+            .inner()
+            .did_open(DidOpenTextDocumentParams {
+                text_document: TextDocumentItem {
+                    uri: uri.clone(),
+                    language_id: "markdown".to_string(),
+                    version: 1,
+                    text: content.to_string(),
+                },
+            })
+            .await;
+
+        // Request code actions
+        let result = service
+            .inner()
+            .code_action(CodeActionParams {
+                text_document: TextDocumentIdentifier { uri },
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 5,
+                        character: 0,
+                    },
+                },
+                context: CodeActionContext {
+                    diagnostics: vec![],
+                    only: None,
+                    trigger_kind: None,
+                },
+                work_done_progress_params: WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            })
+            .await;
+
+        assert!(result.is_ok());
+        // May or may not have actions depending on validation results
+    }
 }

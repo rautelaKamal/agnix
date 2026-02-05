@@ -51,6 +51,16 @@ We use `cargo-audit` in CI to check for known vulnerabilities in dependencies. T
 - **TOCTOU Window**: A small time-of-check-time-of-use window exists between file validation and read/write operations. This is acceptable for the threat model (trusted local files).
 - **YAML Complexity**: While file size limits provide basic protection, deeply nested YAML structures could theoretically cause high memory usage within the 1 MiB limit.
 
+### Safe Error Handling Patterns
+
+The codebase follows these error handling patterns to maintain security:
+
+1. **Graceful Degradation**: Parsing errors skip the problematic file rather than crashing
+2. **No Sensitive Data in Errors**: Error messages avoid exposing file contents or internal state
+3. **UTF-8 Boundary Safety**: Fix application validates UTF-8 character boundaries before modifying content
+4. **Bounded Iteration**: Regex matches and file walks use limits to prevent resource exhaustion
+5. **Early Validation**: Invalid inputs are rejected at parsing stage before deeper processing
+
 ## Security Updates
 
 Security fixes are released as patch versions (e.g., 0.1.1) and announced in:
