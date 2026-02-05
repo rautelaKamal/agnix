@@ -11,7 +11,8 @@ use crate::{
     config::LintConfig,
     diagnostics::Diagnostic,
     file_utils::safe_read_file,
-    parsers::markdown::{extract_imports, extract_markdown_links, Import},
+    parsers::markdown::{extract_imports, extract_markdown_links},
+    parsers::{Import, ImportCache},
     rules::Validator,
 };
 use std::collections::HashMap;
@@ -57,15 +58,32 @@ impl Validator for ImportsValidator {
 
         let project_root = resolve_project_root(path, config);
         let root_path = normalize_existing_path(path);
-        let mut cache: HashMap<PathBuf, Vec<Import>> = HashMap::new();
+
+        // Use shared cache if available (project-level validation),
+        // otherwise create a local cache (single-file validation)
+        let shared_cache = config.import_cache();
+        let mut local_cache: HashMap<PathBuf, Vec<Import>> = HashMap::new();
         let mut visited_depth: HashMap<PathBuf, usize> = HashMap::new();
         let mut stack = Vec::new();
 
-        cache.insert(root_path.clone(), extract_imports(content));
+        // Insert the root file's imports into the appropriate cache (if not already present)
+        let root_imports = extract_imports(content);
+        if let Some(cache) = shared_cache {
+            // Write to shared cache only if not already present
+            let mut guard = cache
+                .write()
+                .expect("ImportCache lock poisoned - this indicates a panic in another thread");
+            guard.entry(root_path.clone()).or_insert(root_imports);
+        } else {
+            // Write to local cache
+            local_cache.entry(root_path.clone()).or_insert(root_imports);
+        }
+
         visit_imports(
             &root_path,
             None,
-            &mut cache,
+            shared_cache,
+            &mut local_cache,
             &mut visited_depth,
             &mut stack,
             &mut diagnostics,
@@ -85,7 +103,8 @@ impl Validator for ImportsValidator {
 fn visit_imports(
     file_path: &PathBuf,
     content_override: Option<&str>,
-    cache: &mut HashMap<PathBuf, Vec<Import>>,
+    shared_cache: Option<&ImportCache>,
+    local_cache: &mut HashMap<PathBuf, Vec<Import>>,
     visited_depth: &mut HashMap<PathBuf, usize>,
     stack: &mut Vec<PathBuf>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -101,7 +120,7 @@ fn visit_imports(
     }
     visited_depth.insert(file_path.clone(), depth);
 
-    let imports = get_imports_for_file(file_path, content_override, cache);
+    let imports = get_imports_for_file(file_path, content_override, shared_cache, local_cache);
     let Some(imports) = imports else { return };
 
     let base_dir = file_path.parent().unwrap_or(Path::new("."));
@@ -263,7 +282,8 @@ fn visit_imports(
             visit_imports(
                 &normalized,
                 None,
-                cache,
+                shared_cache,
+                local_cache,
                 visited_depth,
                 stack,
                 diagnostics,
@@ -277,12 +297,39 @@ fn visit_imports(
     stack.pop();
 }
 
+/// Get imports for a file, using shared cache if available, otherwise local cache.
+///
+/// This function uses a read-then-write lock pattern for the shared cache:
+/// 1. Try to read from cache (read lock)
+/// 2. If miss, drop read lock, parse file, then write (write lock)
+///
+/// This avoids holding locks during file I/O and parsing.
+///
+/// Note: There's a small window for duplicate work where two threads could both
+/// miss the cache and parse the same file. This is acceptable because:
+/// - The extra work is bounded (only one extra parse per file per thread)
+/// - Using entry() API prevents duplicate insertions
+/// - Lock-free parsing enables better parallelism than holding locks during I/O
 fn get_imports_for_file(
     file_path: &Path,
     content_override: Option<&str>,
-    cache: &mut HashMap<PathBuf, Vec<Import>>,
+    shared_cache: Option<&ImportCache>,
+    local_cache: &mut HashMap<PathBuf, Vec<Import>>,
 ) -> Option<Vec<Import>> {
-    if !cache.contains_key(file_path) {
+    // Try shared cache first if available
+    if let Some(cache) = shared_cache {
+        // Read lock - check if already cached
+        {
+            let guard = cache
+                .read()
+                .expect("ImportCache lock poisoned - this indicates a panic in another thread");
+            if let Some(imports) = guard.get(file_path) {
+                return Some(imports.clone());
+            }
+        }
+        // Cache miss - read lock dropped here before I/O
+
+        // Parse the file outside of any lock
         let content = match content_override {
             Some(content) => content.to_string(),
             // Silently skip files that can't be read (symlinks, too large, missing).
@@ -291,9 +338,28 @@ fn get_imports_for_file(
             None => safe_read_file(file_path).ok()?,
         };
         let imports = extract_imports(&content);
-        cache.insert(file_path.to_path_buf(), imports);
+
+        // Write lock - use entry() to handle race condition where another thread
+        // may have already inserted while we were parsing
+        let mut guard = cache
+            .write()
+            .expect("ImportCache lock poisoned - this indicates a panic in another thread");
+        guard
+            .entry(file_path.to_path_buf())
+            .or_insert_with(|| imports.clone());
+        return Some(imports);
     }
-    cache.get(file_path).cloned()
+
+    // Fallback to local cache (single-file validation)
+    if !local_cache.contains_key(file_path) {
+        let content = match content_override {
+            Some(content) => content.to_string(),
+            None => safe_read_file(file_path).ok()?,
+        };
+        let imports = extract_imports(&content);
+        local_cache.insert(file_path.to_path_buf(), imports);
+    }
+    local_cache.get(file_path).cloned()
 }
 
 fn resolve_import_path(import_path: &str, base_dir: &Path) -> PathBuf {
@@ -991,5 +1057,160 @@ mod tests {
 
         // Relative path should resolve correctly
         assert!(!diagnostics.iter().any(|d| d.rule == "REF-002"));
+    }
+
+    // ===== Shared Import Cache Tests =====
+
+    #[test]
+    fn test_single_file_validation_works_without_shared_cache() {
+        // Single-file validation should work without a shared cache
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("target.md");
+        let file_path = temp.path().join("test.md");
+        fs::write(&target, "Target content").unwrap();
+        fs::write(&file_path, "See @target.md").unwrap();
+
+        let config = LintConfig::default();
+        // No shared cache set - should use local cache
+        assert!(config.import_cache().is_none());
+
+        let validator = ImportsValidator;
+        let diagnostics = validator.validate(&file_path, "See @target.md", &config);
+
+        // Should succeed with no errors
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn test_shared_cache_is_populated_after_first_parse() {
+        use std::collections::HashMap;
+        use std::sync::{Arc, RwLock};
+
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("target.md");
+        let file_path = temp.path().join("test.md");
+        fs::write(&target, "Target has @nested.md import").unwrap();
+        fs::write(temp.path().join("nested.md"), "Nested content").unwrap();
+        fs::write(&file_path, "See @target.md").unwrap();
+
+        // Create shared cache
+        let cache: crate::parsers::ImportCache = Arc::new(RwLock::new(HashMap::new()));
+
+        let mut config = LintConfig::default();
+        config.set_import_cache(cache.clone());
+
+        // Verify cache is empty before validation
+        {
+            let guard = cache.read().unwrap();
+            assert!(guard.is_empty());
+        }
+
+        let validator = ImportsValidator;
+        let _ = validator.validate(&file_path, "See @target.md", &config);
+
+        // Verify cache is populated after validation
+        {
+            let guard = cache.read().unwrap();
+            // Should have at least the root file and target file
+            assert!(
+                guard.len() >= 2,
+                "Expected at least 2 entries, got {}",
+                guard.len()
+            );
+        }
+    }
+
+    #[test]
+    fn test_shared_cache_second_access_uses_cached_result() {
+        use std::collections::HashMap;
+        use std::sync::{Arc, RwLock};
+
+        let temp = TempDir::new().unwrap();
+        let target = temp.path().join("target.md");
+        let file_path = temp.path().join("test.md");
+        fs::write(&target, "Target content").unwrap();
+        fs::write(&file_path, "See @target.md").unwrap();
+
+        // Create shared cache
+        let cache: crate::parsers::ImportCache = Arc::new(RwLock::new(HashMap::new()));
+
+        let mut config = LintConfig::default();
+        config.set_import_cache(cache.clone());
+
+        let validator = ImportsValidator;
+
+        // First validation - populates cache
+        let _ = validator.validate(&file_path, "See @target.md", &config);
+        let cache_size_after_first;
+        {
+            let guard = cache.read().unwrap();
+            cache_size_after_first = guard.len();
+        }
+
+        // Second validation - should use cached results
+        let _ = validator.validate(&file_path, "See @target.md", &config);
+        let cache_size_after_second;
+        {
+            let guard = cache.read().unwrap();
+            cache_size_after_second = guard.len();
+        }
+
+        // Cache size should be the same (entries reused, not duplicated)
+        assert_eq!(cache_size_after_first, cache_size_after_second);
+    }
+
+    #[test]
+    fn test_shared_cache_concurrent_access() {
+        use std::collections::HashMap;
+        use std::sync::{Arc, RwLock};
+        use std::thread;
+
+        let temp = TempDir::new().unwrap();
+
+        // Create multiple files that reference each other
+        for i in 0..5 {
+            let content = if i < 4 {
+                format!("Content with @file{}.md import", i + 1)
+            } else {
+                "End of chain".to_string()
+            };
+            fs::write(temp.path().join(format!("file{}.md", i)), content).unwrap();
+        }
+
+        // Create shared cache
+        let cache: crate::parsers::ImportCache = Arc::new(RwLock::new(HashMap::new()));
+
+        // Spawn multiple threads that validate different files with the same cache
+        let handles: Vec<_> = (0..5)
+            .map(|i| {
+                let cache = cache.clone();
+                let temp_path = temp.path().to_path_buf();
+                thread::spawn(move || {
+                    let mut config = LintConfig::default();
+                    config.set_import_cache(cache);
+
+                    let file_path = temp_path.join(format!("file{}.md", i));
+                    let content = fs::read_to_string(&file_path).unwrap();
+
+                    let validator = ImportsValidator;
+                    validator.validate(&file_path, &content, &config)
+                })
+            })
+            .collect();
+
+        // All threads should complete without panic (no deadlock)
+        for handle in handles {
+            let result = handle.join();
+            assert!(result.is_ok(), "Thread should complete without panic");
+        }
+
+        // Cache should have entries
+        {
+            let guard = cache.read().unwrap();
+            assert!(
+                !guard.is_empty(),
+                "Cache should have entries after concurrent access"
+            );
+        }
     }
 }
