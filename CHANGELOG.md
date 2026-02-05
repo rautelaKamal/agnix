@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Opt-in telemetry module with privacy-first design (#209)
+  - Disabled by default, requires explicit `agnix telemetry enable`
+  - Tracks aggregate metrics: rule trigger counts, error/warning counts, duration
+  - Never collects: file paths, contents, user identity
+  - Respects DO_NOT_TRACK, CI, GITHUB_ACTIONS environment variables
+  - Feature-gated HTTP client for minimal binary size impact
+  - Local event queue for offline storage with automatic retry
+- `agnix telemetry` subcommand with status/enable/disable commands
+- Comprehensive telemetry documentation in SECURITY.md
+- Rule ID validation at collection point (defense-in-depth)
+
 ### Changed
 - Refactored HooksValidator into standalone validation functions (#212)
   - Extracted 12 validation rules (CC-HK-001 through CC-HK-012) into standalone functions
