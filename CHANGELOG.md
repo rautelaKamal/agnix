@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-02-05
+
+### Fixed
+- npm package wrapper script now preserved during binary installation
+  - Fixes "command not found" error when running `agnix` from npm install
+  - Postinstall script backs up and restores wrapper script
+
 ## [0.7.1] - 2026-02-05
 
 ### Fixed
