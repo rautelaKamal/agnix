@@ -50,6 +50,7 @@ pub struct SpecRevisions {
 
 /// Configuration for the linter
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LintConfig {
     /// Severity level threshold
     pub severity: SeverityLevel,
