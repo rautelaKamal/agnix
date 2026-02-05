@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as https from 'https';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -8,11 +11,21 @@ import {
   TransportKind,
 } from 'vscode-languageclient/node';
 
+const execAsync = promisify(exec);
+
 let client: LanguageClient | undefined;
 let statusBarItem: vscode.StatusBarItem;
 let outputChannel: vscode.OutputChannel;
 let codeLensProvider: AgnixCodeLensProvider | undefined;
 let diagnosticsTreeProvider: AgnixDiagnosticsTreeProvider | undefined;
+let extensionContext: vscode.ExtensionContext;
+
+const GITHUB_REPO = 'avifenesh/agnix';
+
+interface PlatformInfo {
+  asset: string;
+  binary: string;
+}
 
 const AGNIX_FILE_PATTERNS = [
   '**/SKILL.md',
@@ -28,9 +41,205 @@ const AGNIX_FILE_PATTERNS = [
   '**/.cursor/rules/*.mdc',
 ];
 
+/**
+ * Get platform-specific download info for agnix-lsp.
+ */
+function getPlatformInfo(): PlatformInfo | null {
+  const platform = process.platform;
+  const arch = process.arch;
+
+  if (platform === 'darwin') {
+    if (arch === 'arm64') {
+      return {
+        asset: 'agnix-aarch64-apple-darwin.tar.gz',
+        binary: 'agnix-lsp',
+      };
+    }
+    // x64 Mac can use ARM binary via Rosetta
+    return {
+      asset: 'agnix-aarch64-apple-darwin.tar.gz',
+      binary: 'agnix-lsp',
+    };
+  } else if (platform === 'linux') {
+    if (arch === 'x64') {
+      return {
+        asset: 'agnix-x86_64-unknown-linux-gnu.tar.gz',
+        binary: 'agnix-lsp',
+      };
+    }
+    return null;
+  } else if (platform === 'win32') {
+    if (arch === 'x64') {
+      return {
+        asset: 'agnix-x86_64-pc-windows-msvc.zip',
+        binary: 'agnix-lsp.exe',
+      };
+    }
+    return null;
+  }
+
+  return null;
+}
+
+/**
+ * Download a file from URL, following redirects.
+ */
+function downloadFile(url: string, destPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destPath);
+
+    const request = https.get(url, (response) => {
+      // Handle redirects (GitHub releases use them)
+      if (response.statusCode === 302 || response.statusCode === 301) {
+        const redirectUrl = response.headers.location;
+        if (redirectUrl) {
+          file.close();
+          try {
+            fs.unlinkSync(destPath);
+          } catch {}
+          downloadFile(redirectUrl, destPath).then(resolve).catch(reject);
+          return;
+        }
+      }
+
+      if (response.statusCode !== 200) {
+        file.close();
+        reject(new Error(`Download failed with status ${response.statusCode}`));
+        return;
+      }
+
+      response.pipe(file);
+
+      file.on('finish', () => {
+        file.close();
+        resolve();
+      });
+    });
+
+    request.on('error', (err) => {
+      file.close();
+      try {
+        fs.unlinkSync(destPath);
+      } catch {}
+      reject(err);
+    });
+
+    file.on('error', (err) => {
+      try {
+        fs.unlinkSync(destPath);
+      } catch {}
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Download and install agnix-lsp from GitHub releases.
+ */
+async function downloadAndInstallLsp(): Promise<string | null> {
+  const platformInfo = getPlatformInfo();
+  if (!platformInfo) {
+    vscode.window.showErrorMessage(
+      'No pre-built agnix-lsp available for your platform. Please install manually: cargo install agnix-lsp'
+    );
+    return null;
+  }
+
+  const releaseUrl = `https://github.com/${GITHUB_REPO}/releases/latest/download/${platformInfo.asset}`;
+
+  // Create storage directory
+  const storageUri = extensionContext.globalStorageUri;
+  await vscode.workspace.fs.createDirectory(storageUri);
+
+  const downloadPath = path.join(storageUri.fsPath, platformInfo.asset);
+  const binaryPath = path.join(storageUri.fsPath, platformInfo.binary);
+
+  try {
+    await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: 'Installing agnix-lsp',
+        cancellable: false,
+      },
+      async (progress) => {
+        progress.report({ message: 'Downloading...' });
+        outputChannel.appendLine(`Downloading from: ${releaseUrl}`);
+
+        await downloadFile(releaseUrl, downloadPath);
+
+        progress.report({ message: 'Extracting...' });
+        outputChannel.appendLine(`Extracting to: ${storageUri.fsPath}`);
+
+        if (process.platform === 'win32') {
+          // PowerShell extraction for .zip
+          await execAsync(
+            `powershell -Command "Expand-Archive -Path '${downloadPath}' -DestinationPath '${storageUri.fsPath}' -Force"`,
+            { timeout: 60000 }
+          );
+        } else {
+          // tar extraction for .tar.gz
+          await execAsync(
+            `tar -xzf "${downloadPath}" -C "${storageUri.fsPath}"`,
+            { timeout: 60000 }
+          );
+          // Make executable
+          await execAsync(`chmod +x "${binaryPath}"`);
+        }
+
+        // Clean up archive
+        try {
+          fs.unlinkSync(downloadPath);
+        } catch {}
+      }
+    );
+
+    // Verify binary exists
+    if (fs.existsSync(binaryPath)) {
+      outputChannel.appendLine(`agnix-lsp installed at: ${binaryPath}`);
+      vscode.window.showInformationMessage('agnix-lsp installed successfully');
+      return binaryPath;
+    } else {
+      throw new Error('Binary not found after extraction');
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    outputChannel.appendLine(`Installation failed: ${message}`);
+    vscode.window.showErrorMessage(`Failed to install agnix-lsp: ${message}`);
+    return null;
+  }
+}
+
+/**
+ * Get the path to agnix-lsp, checking settings, PATH, and global storage.
+ */
+function findLspBinary(): string | null {
+  const config = vscode.workspace.getConfiguration('agnix');
+  const configuredPath = config.get<string>('lspPath', 'agnix-lsp');
+
+  // Check configured path first
+  if (checkLspExists(configuredPath)) {
+    return configuredPath;
+  }
+
+  // Check if we have a downloaded binary in global storage
+  const platformInfo = getPlatformInfo();
+  if (platformInfo) {
+    const storagePath = path.join(
+      extensionContext.globalStorageUri.fsPath,
+      platformInfo.binary
+    );
+    if (fs.existsSync(storagePath)) {
+      return storagePath;
+    }
+  }
+
+  return null;
+}
+
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
+  extensionContext = context;
   outputChannel = vscode.window.createOutputChannel('agnix');
   context.subscriptions.push(outputChannel);
 
@@ -129,34 +338,43 @@ export async function activate(
 }
 
 async function startClient(): Promise<void> {
-  const config = vscode.workspace.getConfiguration('agnix');
-  const lspPath = config.get<string>('lspPath', 'agnix-lsp');
+  let lspPath = findLspBinary();
 
-  const lspExists = checkLspExists(lspPath);
-  if (!lspExists) {
+  if (!lspPath) {
     updateStatusBar('error', 'agnix-lsp not found');
-    outputChannel.appendLine(`Error: Could not find agnix-lsp at: ${lspPath}`);
-    outputChannel.appendLine('');
-    outputChannel.appendLine('To install agnix-lsp:');
-    outputChannel.appendLine('  cargo install --path crates/agnix-lsp');
-    outputChannel.appendLine('');
-    outputChannel.appendLine('Or set the path in settings:');
-    outputChannel.appendLine('  "agnix.lspPath": "/path/to/agnix-lsp"');
+    outputChannel.appendLine('agnix-lsp not found in PATH or settings');
 
-    vscode.window
-      .showErrorMessage(
-        'agnix-lsp not found. Install it with: cargo install --path crates/agnix-lsp',
-        'Open Settings'
-      )
-      .then((selection) => {
-        if (selection === 'Open Settings') {
-          vscode.commands.executeCommand(
-            'workbench.action.openSettings',
-            'agnix.lspPath'
-          );
-        }
-      });
-    return;
+    // Offer to download
+    const choice = await vscode.window.showErrorMessage(
+      'agnix-lsp not found. Would you like to download it automatically?',
+      'Download',
+      'Install Manually',
+      'Open Settings'
+    );
+
+    if (choice === 'Download') {
+      lspPath = await downloadAndInstallLsp();
+      if (!lspPath) {
+        return;
+      }
+    } else if (choice === 'Install Manually') {
+      outputChannel.appendLine('');
+      outputChannel.appendLine('To install agnix-lsp manually:');
+      outputChannel.appendLine('  cargo install agnix-lsp');
+      outputChannel.appendLine('');
+      outputChannel.appendLine('Or via Homebrew (macOS/Linux):');
+      outputChannel.appendLine('  brew tap avifenesh/agnix && brew install agnix');
+      outputChannel.show();
+      return;
+    } else if (choice === 'Open Settings') {
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        'agnix.lspPath'
+      );
+      return;
+    } else {
+      return;
+    }
   }
 
   outputChannel.appendLine(`Starting agnix-lsp from: ${lspPath}`);

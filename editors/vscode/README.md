@@ -54,7 +54,9 @@ Right-click on agent config files to:
 
 ## Requirements
 
-Install the `agnix-lsp` binary:
+The `agnix-lsp` binary is **automatically downloaded** on first use. No manual installation required.
+
+If you prefer to install manually:
 
 ```bash
 # From crates.io
@@ -90,14 +92,17 @@ See [configuration docs](https://github.com/avifenesh/agnix/blob/main/docs/CONFI
 
 ### agnix-lsp not found
 
+The extension automatically downloads agnix-lsp on first use. If automatic download fails:
+
 ```bash
-# Check if installed
-which agnix-lsp  # Unix
-where agnix-lsp  # Windows
+# Manual install from crates.io
+cargo install agnix-lsp
 
 # Or specify full path in settings
 "agnix.lspPath": "/path/to/agnix-lsp"
 ```
+
+The auto-downloaded binary is stored in the extension's global storage directory.
 
 ### No diagnostics appearing
 
