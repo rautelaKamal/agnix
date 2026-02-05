@@ -1,5 +1,5 @@
 # Multi-stage build for minimal image size
-FROM rust:1.83-alpine AS builder
+FROM rust:1.85-alpine AS builder
 
 # Install musl-dev for static linking
 RUN apk add --no-cache musl-dev

@@ -185,6 +185,9 @@ jobs:
             exit 1
           fi
 
+      - name: Compile extension
+        run: npm run compile -- --production
+
       - name: Package extension
         run: npx vsce package
 
