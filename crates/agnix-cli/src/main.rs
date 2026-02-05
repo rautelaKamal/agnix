@@ -8,7 +8,7 @@ mod watch;
 use agnix_core::{
     apply_fixes,
     config::{LintConfig, TargetTool},
-    diagnostics::DiagnosticLevel,
+    diagnostics::{Diagnostic, DiagnosticLevel},
     eval::{evaluate_manifest_file, EvalFormat},
     generate_schema, validate_project, ValidationResult,
 };
@@ -232,6 +232,18 @@ fn main() {
     }
 }
 
+fn count_errors_warnings(diagnostics: &[Diagnostic]) -> (usize, usize) {
+    let errors = diagnostics
+        .iter()
+        .filter(|d| d.level == DiagnosticLevel::Error)
+        .count();
+    let warnings = diagnostics
+        .iter()
+        .filter(|d| d.level == DiagnosticLevel::Warning)
+        .count();
+    (errors, warnings)
+}
+
 #[tracing::instrument(skip(cli), fields(path = %path.display()))]
 fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
     tracing::debug!("Starting validation");
@@ -385,14 +397,7 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let errors = diagnostics
-        .iter()
-        .filter(|d| d.level == DiagnosticLevel::Error)
-        .count();
-    let warnings = diagnostics
-        .iter()
-        .filter(|d| d.level == DiagnosticLevel::Warning)
-        .count();
+    let (errors, warnings) = count_errors_warnings(&diagnostics);
     let infos = diagnostics
         .iter()
         .filter(|d| d.level == DiagnosticLevel::Info)
@@ -463,6 +468,9 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
         );
     }
 
+    let mut final_errors = errors;
+    let mut final_warnings = warnings;
+
     // --fix-safe implies --fix
     if should_fix {
         println!();
@@ -502,6 +510,16 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
                 if results.len() == 1 { "file" } else { "files" }
             );
         }
+
+        // Re-run validation after applying fixes so exit code reflects remaining issues.
+        if !cli.dry_run {
+            let ValidationResult {
+                diagnostics: post_fix_diagnostics,
+                files_checked: _,
+            } = validate_project(path, &config)?;
+
+            (final_errors, final_warnings) = count_errors_warnings(&post_fix_diagnostics);
+        }
     } else if fixable > 0 {
         println!();
         println!(
@@ -512,7 +530,7 @@ fn validate_command(path: &Path, cli: &Cli) -> anyhow::Result<()> {
     }
 
     // Exit with error if errors remain (even after fixing) or strict mode with warnings
-    if errors > 0 || (cli.strict && warnings > 0) {
+    if final_errors > 0 || (cli.strict && final_warnings > 0) {
         process::exit(1);
     }
 
