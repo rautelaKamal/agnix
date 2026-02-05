@@ -79,6 +79,9 @@ Then run `/agnix` to validate your project, `/agnix --fix` to auto-fix issues.
 ## Quick Start
 
 ```bash
+# Run without installing
+npx agnix .
+
 # Validate current directory
 agnix .
 
@@ -145,7 +148,7 @@ See [full action documentation](docs/CONFIGURATION.md#github-action) for all inp
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/avifenesh/agnix
-    rev: v0.4.0
+    rev: v0.7.0
     hooks:
       - id: agnix
 ```

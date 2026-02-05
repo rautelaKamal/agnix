@@ -67,6 +67,12 @@ function getPlatformInfo(): PlatformInfo | null {
         binary: 'agnix-lsp',
       };
     }
+    if (arch === 'arm64') {
+      return {
+        asset: 'agnix-aarch64-unknown-linux-gnu.tar.gz',
+        binary: 'agnix-lsp',
+      };
+    }
     return null;
   } else if (platform === 'win32') {
     if (arch === 'x64') {

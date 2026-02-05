@@ -34,8 +34,7 @@ function getPlatformInfo() {
       binary: 'agnix-binary',
     },
     'linux-arm64': {
-      // ARM Linux not yet available, try x64 with emulation
-      asset: 'agnix-x86_64-unknown-linux-gnu.tar.gz',
+      asset: 'agnix-aarch64-unknown-linux-gnu.tar.gz',
       extractedName: 'agnix',
       binary: 'agnix-binary',
     },
