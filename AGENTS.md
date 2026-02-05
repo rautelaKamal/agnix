@@ -51,7 +51,8 @@ crates/
 └── agnix-mcp/      # MCP server (rmcp)
 editors/
 ├── neovim/         # Neovim plugin
-└── vscode/         # VS Code extension
+├── vscode/         # VS Code extension
+└── jetbrains/      # JetBrains IDE plugin
 knowledge-base/     # 100 rules, 75+ sources, rules.json
 tests/fixtures/     # Test cases by category
 ```

@@ -219,6 +219,7 @@ cargo install agnix-lsp
 Real-time diagnostics as you type, quick-fix code actions, hover documentation.
 
 ![VS Code validation example](assets/vscode-validation.png)
+![JetBrains validation example](editors/jetbrains/assets/jetbrains-validation.png)
 
 **VS Code extension** includes a comprehensive settings UI for configuring all validation options. Changes apply immediately without server restart. See [VS Code extension](editors/vscode/README.md) for details.
 
@@ -339,7 +340,7 @@ crates/
 editors/
   neovim/         # Neovim plugin
   vscode/         # VS Code extension
-  jetbrains/      # JetBrains extension scaffold (WIP)
+  jetbrains/      # JetBrains IDE plugin
 knowledge-base/   # 100 rules documentation
 ```
 
@@ -351,8 +352,8 @@ knowledge-base/   # 100 rules documentation
 - **LSP server** for real-time editor diagnostics
 - **MCP server** for AI assistant integration
 - **VS Code extension** with syntax highlighting
+- **JetBrains IDE plugin** under `editors/jetbrains/` (LSP4IJ-based)
 - **Neovim plugin** with LSP integration and Telescope support
-- **JetBrains extension scaffold** under `editors/jetbrains/` (work in progress)
 - **GitHub Action** for CI/CD integration
 - **Auto-fix** infrastructure (--fix, --dry-run, --fix-safe)
 - **Parallel validation** using rayon

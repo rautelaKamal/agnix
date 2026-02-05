@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rule contribution and tool support request issue templates (#191)
 - Expanded CONTRIBUTING.md with rule authoring guide, evidence requirements, and tier system (#191)
 - JetBrains IDE plugin with LSP integration (#196)
-  - Supports IntelliJ IDEA, WebStorm, PyCharm, and all JetBrains IDEs (2023.2+)
+  - Supports IntelliJ IDEA, WebStorm, PyCharm, and all JetBrains IDEs (2023.3+)
   - Real-time validation, quick fixes, hover documentation
   - Auto-download of agnix-lsp binary from GitHub releases
   - Settings UI with LSP path configuration, auto-download toggle, trace level
