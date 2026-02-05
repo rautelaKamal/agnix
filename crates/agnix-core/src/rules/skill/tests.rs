@@ -2277,7 +2277,7 @@ fn test_as_012_exactly_500_lines_ok() {
 
 #[test]
 fn test_cc_sk_001_all_valid_models() {
-    // Must match VALID_MODELS constant in skill.rs
+    // Must match VALID_MODELS constant in skill/mod.rs
     let valid_models = VALID_MODELS;
 
     for model in valid_models {
@@ -2389,7 +2389,7 @@ Body"#;
 
 #[test]
 fn test_cc_sk_005_builtin_agents_valid() {
-    // Must match BUILTIN_AGENTS constant in skill.rs
+    // Must match BUILTIN_AGENTS constant in skill/mod.rs
     let builtin_agents = BUILTIN_AGENTS;
 
     for agent in builtin_agents {
