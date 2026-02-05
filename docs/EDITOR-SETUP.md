@@ -98,6 +98,65 @@ language-servers = ["agnix-lsp"]
 command = "agnix-lsp"
 ```
 
+## Cursor
+
+Cursor is built on VS Code, so the VS Code extension works directly. The extension validates `.cursor/rules/*.mdc` files automatically.
+
+### Installation
+
+1. Install the VS Code extension (see VS Code section above)
+2. Cursor will detect and use it automatically
+
+### Cursor-Specific Validation
+
+agnix validates Cursor project rules with the following rules:
+
+| Rule | Severity | Description |
+|------|----------|-------------|
+| CUR-001 | ERROR | Empty .mdc rule file |
+| CUR-002 | WARNING | Missing frontmatter |
+| CUR-003 | ERROR | Invalid YAML frontmatter |
+| CUR-004 | ERROR | Invalid glob pattern in globs field |
+| CUR-005 | WARNING | Unknown frontmatter keys |
+| CUR-006 | WARNING | Legacy .cursorrules detected |
+
+### File Structure
+
+Cursor project rules should be in `.cursor/rules/`:
+
+```
+.cursor/
+  rules/
+    typescript.mdc
+    testing.mdc
+    documentation.mdc
+```
+
+### MDC Frontmatter
+
+Each `.mdc` file should have frontmatter:
+
+```markdown
+---
+description: TypeScript coding standards
+globs: ["**/*.ts", "**/*.tsx"]
+alwaysApply: false
+---
+
+# TypeScript Rules
+
+Your rules here...
+```
+
+### Migration from .cursorrules
+
+If using legacy `.cursorrules` file, agnix warns about migration (CUR-006). To migrate:
+
+1. Create `.cursor/rules/` directory
+2. Split rules into focused `.mdc` files
+3. Add frontmatter with `description` and `globs`
+4. Delete `.cursorrules`
+
 ## Supported File Types
 
 - `SKILL.md` - Agent skill definitions
