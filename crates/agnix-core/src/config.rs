@@ -1,9 +1,11 @@
 //! Linter configuration
 
 use crate::file_utils::safe_read_file;
+use crate::fs::{FileSystem, RealFileSystem};
 use crate::schemas::mcp::DEFAULT_MCP_PROTOCOL_VERSION;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Tool version pinning for version-aware validation
 ///
@@ -96,6 +98,14 @@ pub struct LintConfig {
     /// shared across all file validations in a project.
     #[serde(skip)]
     pub import_cache: Option<crate::parsers::ImportCache>,
+
+    /// File system abstraction for testability (not serialized).
+    ///
+    /// Validators use this to perform file system operations. Defaults to
+    /// `RealFileSystem` which delegates to `std::fs` and `file_utils`.
+    /// For testing, this can be replaced with `MockFileSystem`.
+    #[serde(skip)]
+    fs: Arc<dyn FileSystem>,
 }
 
 impl Default for LintConfig {
@@ -115,6 +125,7 @@ impl Default for LintConfig {
             spec_revisions: SpecRevisions::default(),
             root_dir: None,
             import_cache: None,
+            fs: Arc::new(RealFileSystem),
         }
     }
 }
@@ -295,6 +306,28 @@ impl LintConfig {
     /// validation where import results are shared across files.
     pub fn import_cache(&self) -> Option<&crate::parsers::ImportCache> {
         self.import_cache.as_ref()
+    }
+
+    /// Get the file system abstraction.
+    ///
+    /// Validators should use this for file system operations instead of
+    /// directly calling `std::fs` functions. This enables unit testing
+    /// with `MockFileSystem`.
+    pub fn fs(&self) -> &Arc<dyn FileSystem> {
+        &self.fs
+    }
+
+    /// Set the file system abstraction (not persisted).
+    ///
+    /// This is primarily used for testing with `MockFileSystem`.
+    ///
+    /// # Important
+    ///
+    /// This should only be called during configuration setup, before validation
+    /// begins. Changing the filesystem during validation may cause inconsistent
+    /// results if validators have already cached file state.
+    pub fn set_fs(&mut self, fs: Arc<dyn FileSystem>) {
+        self.fs = fs;
     }
 
     /// Get the expected MCP protocol version
@@ -2196,5 +2229,99 @@ disabled_rules = []
         assert!(config.rules.skills);
         assert!(config.rules.hooks);
         assert!(config.rules.disabled_rules.is_empty());
+    }
+
+    // ===== FileSystem Abstraction Tests =====
+
+    #[test]
+    fn test_default_config_uses_real_filesystem() {
+        let config = LintConfig::default();
+
+        // Default fs() should be RealFileSystem
+        let fs = config.fs();
+
+        // Verify it works by checking a file that should exist
+        assert!(fs.exists(Path::new("Cargo.toml")));
+        assert!(!fs.exists(Path::new("nonexistent_xyz_abc.txt")));
+    }
+
+    #[test]
+    fn test_set_fs_replaces_filesystem() {
+        use crate::fs::{FileSystem, MockFileSystem};
+
+        let mut config = LintConfig::default();
+
+        // Create a mock filesystem with a test file
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_file("/mock/test.md", "mock content");
+
+        // Replace the filesystem (coerce to trait object)
+        let fs_arc: Arc<dyn FileSystem> = Arc::clone(&mock_fs) as Arc<dyn FileSystem>;
+        config.set_fs(fs_arc);
+
+        // Verify fs() returns the mock
+        let fs = config.fs();
+        assert!(fs.exists(Path::new("/mock/test.md")));
+        assert!(!fs.exists(Path::new("Cargo.toml"))); // Real file shouldn't exist in mock
+
+        // Verify we can read from the mock
+        let content = fs.read_to_string(Path::new("/mock/test.md")).unwrap();
+        assert_eq!(content, "mock content");
+    }
+
+    #[test]
+    fn test_set_fs_is_not_serialized() {
+        use crate::fs::MockFileSystem;
+
+        let mut config = LintConfig::default();
+        config.set_fs(Arc::new(MockFileSystem::new()));
+
+        // Serialize and deserialize
+        let serialized = toml::to_string(&config).unwrap();
+        let deserialized: LintConfig = toml::from_str(&serialized).unwrap();
+
+        // Deserialized config should have RealFileSystem (default)
+        // because fs is marked with #[serde(skip)]
+        let fs = deserialized.fs();
+        // RealFileSystem can see Cargo.toml, MockFileSystem cannot
+        assert!(fs.exists(Path::new("Cargo.toml")));
+    }
+
+    #[test]
+    fn test_fs_can_be_shared_across_threads() {
+        use crate::fs::{FileSystem, MockFileSystem};
+        use std::thread;
+
+        let mut config = LintConfig::default();
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_file("/test/file.md", "content");
+
+        // Coerce to trait object and set
+        let fs_arc: Arc<dyn FileSystem> = mock_fs;
+        config.set_fs(fs_arc);
+
+        // Get fs reference
+        let fs = Arc::clone(config.fs());
+
+        // Spawn a thread that uses the filesystem
+        let handle = thread::spawn(move || {
+            assert!(fs.exists(Path::new("/test/file.md")));
+            let content = fs.read_to_string(Path::new("/test/file.md")).unwrap();
+            assert_eq!(content, "content");
+        });
+
+        handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_config_fs_returns_arc_ref() {
+        let config = LintConfig::default();
+
+        // fs() returns &Arc<dyn FileSystem>
+        let fs1 = config.fs();
+        let fs2 = config.fs();
+
+        // Both should point to the same Arc
+        assert!(Arc::ptr_eq(fs1, fs2));
     }
 }

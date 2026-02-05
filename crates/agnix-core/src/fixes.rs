@@ -1,9 +1,10 @@
 //! Fix application engine for automatic corrections
 
 use crate::diagnostics::{Diagnostic, Fix, LintResult};
-use crate::file_utils::{safe_read_file, safe_write_file};
+use crate::fs::{FileSystem, RealFileSystem};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Result of applying fixes to a file
 #[derive(Debug, Clone)]
@@ -39,6 +40,27 @@ pub fn apply_fixes(
     dry_run: bool,
     safe_only: bool,
 ) -> LintResult<Vec<FixResult>> {
+    apply_fixes_with_fs(diagnostics, dry_run, safe_only, None)
+}
+
+/// Apply fixes from diagnostics to files with optional FileSystem abstraction
+///
+/// # Arguments
+/// * `diagnostics` - Diagnostics with potential fixes
+/// * `dry_run` - If true, compute fixes but don't write files
+/// * `safe_only` - If true, only apply fixes marked as safe
+/// * `fs` - Optional FileSystem for reading/writing files. If None, uses RealFileSystem.
+///
+/// # Returns
+/// Vector of fix results, one per file that had fixes
+pub fn apply_fixes_with_fs(
+    diagnostics: &[Diagnostic],
+    dry_run: bool,
+    safe_only: bool,
+    fs: Option<Arc<dyn FileSystem>>,
+) -> LintResult<Vec<FixResult>> {
+    let fs = fs.unwrap_or_else(|| Arc::new(RealFileSystem));
+
     // Group diagnostics by file
     let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
     for diag in diagnostics {
@@ -50,7 +72,7 @@ pub fn apply_fixes(
     let mut results = Vec::new();
 
     for (path, file_diagnostics) in by_file {
-        let original = safe_read_file(&path)?;
+        let original = fs.read_to_string(&path)?;
 
         let mut fixes: Vec<&Fix> = file_diagnostics
             .iter()
@@ -69,7 +91,7 @@ pub fn apply_fixes(
 
         if fixed != original {
             if !dry_run {
-                safe_write_file(&path, &fixed)?;
+                fs.write(&path, &fixed)?;
             }
 
             results.push(FixResult {
@@ -347,5 +369,177 @@ mod tests {
         assert_eq!(result, "hello universe");
         assert_eq!(applied.len(), 1);
         assert_eq!(applied[0], "Fix 1");
+    }
+
+    // ===== MockFileSystem Integration Tests =====
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_dry_run() {
+        use crate::fs::MockFileSystem;
+
+        let mock_fs = MockFileSystem::new();
+        mock_fs.add_file("/project/test.md", "name: Bad_Name");
+
+        let diagnostics = vec![make_diagnostic(
+            "/project/test.md",
+            vec![Fix::replace(6, 14, "good-name", "Fix name", true)],
+        )];
+
+        // Dry run with mock filesystem
+        let results =
+            apply_fixes_with_fs(&diagnostics, true, false, Some(Arc::new(mock_fs))).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].original, "name: Bad_Name");
+        assert_eq!(results[0].fixed, "name: good-name");
+        assert!(results[0].has_changes());
+
+        // File should be unchanged (dry run)
+        // Note: We can't verify this directly since we passed ownership,
+        // but the logic is tested - dry_run=true means no write() call
+    }
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_actual_write() {
+        use crate::fs::{FileSystem, MockFileSystem};
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_file("/project/test.md", "name: Bad_Name");
+
+        let diagnostics = vec![make_diagnostic(
+            "/project/test.md",
+            vec![Fix::replace(6, 14, "good-name", "Fix name", true)],
+        )];
+
+        // Clone as trait object for apply_fixes_with_fs
+        let fs_clone: Arc<dyn FileSystem> = Arc::clone(&mock_fs) as Arc<dyn FileSystem>;
+
+        // Actually apply with mock filesystem
+        let results = apply_fixes_with_fs(&diagnostics, false, false, Some(fs_clone)).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].fixed, "name: good-name");
+
+        // Verify mock filesystem was updated
+        let content = mock_fs
+            .read_to_string(std::path::Path::new("/project/test.md"))
+            .unwrap();
+        assert_eq!(content, "name: good-name");
+    }
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_safe_only() {
+        use crate::fs::{FileSystem, MockFileSystem};
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_file("/project/test.md", "name: Bad_Name");
+
+        let diagnostics = vec![make_diagnostic(
+            "/project/test.md",
+            vec![
+                Fix::replace(6, 14, "safe-name", "Safe fix", true),
+                Fix::replace(0, 4, "NAME", "Unsafe fix", false),
+            ],
+        )];
+
+        // Clone as trait object for apply_fixes_with_fs
+        let fs_clone: Arc<dyn FileSystem> = Arc::clone(&mock_fs) as Arc<dyn FileSystem>;
+
+        // Apply with safe_only = true
+        let results = apply_fixes_with_fs(&diagnostics, false, true, Some(fs_clone)).unwrap();
+
+        assert_eq!(results.len(), 1);
+        // Only safe fix should be applied
+        assert_eq!(results[0].fixed, "name: safe-name");
+        assert_eq!(results[0].applied.len(), 1);
+        assert_eq!(results[0].applied[0], "Safe fix");
+
+        // Verify mock filesystem reflects only safe fix
+        let content = mock_fs
+            .read_to_string(std::path::Path::new("/project/test.md"))
+            .unwrap();
+        assert_eq!(content, "name: safe-name");
+    }
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_multiple_files() {
+        use crate::fs::{FileSystem, MockFileSystem};
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_file("/project/file1.md", "old1");
+        mock_fs.add_file("/project/file2.md", "old2");
+
+        let diagnostics = vec![
+            make_diagnostic(
+                "/project/file1.md",
+                vec![Fix::replace(0, 4, "new1", "Fix file1", true)],
+            ),
+            make_diagnostic(
+                "/project/file2.md",
+                vec![Fix::replace(0, 4, "new2", "Fix file2", true)],
+            ),
+        ];
+
+        // Clone as trait object for apply_fixes_with_fs
+        let fs_clone: Arc<dyn FileSystem> = Arc::clone(&mock_fs) as Arc<dyn FileSystem>;
+
+        let results = apply_fixes_with_fs(&diagnostics, false, false, Some(fs_clone)).unwrap();
+
+        assert_eq!(results.len(), 2);
+
+        // Verify both files were updated
+        let content1 = mock_fs
+            .read_to_string(std::path::Path::new("/project/file1.md"))
+            .unwrap();
+        let content2 = mock_fs
+            .read_to_string(std::path::Path::new("/project/file2.md"))
+            .unwrap();
+
+        assert_eq!(content1, "new1");
+        assert_eq!(content2, "new2");
+    }
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_file_not_found() {
+        use crate::fs::MockFileSystem;
+
+        let mock_fs = MockFileSystem::new();
+        // Don't add the file - it should error
+
+        let diagnostics = vec![make_diagnostic(
+            "/project/nonexistent.md",
+            vec![Fix::replace(0, 4, "new", "Fix", true)],
+        )];
+
+        let result = apply_fixes_with_fs(&diagnostics, false, false, Some(Arc::new(mock_fs)));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_fixes_with_mock_fs_no_changes() {
+        use crate::fs::MockFileSystem;
+
+        let mock_fs = MockFileSystem::new();
+        mock_fs.add_file("/project/test.md", "unchanged");
+
+        // Diagnostic with no fixes
+        let diagnostics = vec![Diagnostic {
+            level: DiagnosticLevel::Error,
+            message: "No fix available".to_string(),
+            file: PathBuf::from("/project/test.md"),
+            line: 1,
+            column: 1,
+            rule: "TEST-001".to_string(),
+            suggestion: None,
+            fixes: Vec::new(),
+            assumption: None,
+        }];
+
+        let results =
+            apply_fixes_with_fs(&diagnostics, false, false, Some(Arc::new(mock_fs))).unwrap();
+
+        // No fixes means no results
+        assert!(results.is_empty());
     }
 }

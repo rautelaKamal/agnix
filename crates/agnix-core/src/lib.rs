@@ -25,6 +25,7 @@ pub mod diagnostics;
 pub mod eval;
 mod file_utils;
 pub mod fixes;
+pub mod fs;
 pub mod parsers;
 mod rules;
 mod schemas;
@@ -39,7 +40,8 @@ use std::sync::Mutex;
 
 pub use config::LintConfig;
 pub use diagnostics::{Diagnostic, DiagnosticLevel, Fix, LintError, LintResult};
-pub use fixes::{apply_fixes, FixResult};
+pub use fixes::{apply_fixes, apply_fixes_with_fs, FixResult};
+pub use fs::{FileSystem, MockFileSystem, RealFileSystem};
 pub use rules::Validator;
 
 /// Result of validating a project, including diagnostics and metadata.

@@ -3,8 +3,8 @@
 //! Validates Claude Code subagent definitions in `.claude/agents/*.md`
 
 use crate::{
-    config::LintConfig, diagnostics::Diagnostic, parsers::frontmatter::parse_frontmatter,
-    rules::Validator, schemas::agent::AgentSchema,
+    config::LintConfig, diagnostics::Diagnostic, fs::FileSystem,
+    parsers::frontmatter::parse_frontmatter, rules::Validator, schemas::agent::AgentSchema,
 };
 use std::collections::HashSet;
 use std::path::Path;
@@ -29,14 +29,14 @@ const MAX_TRAVERSAL_DEPTH: usize = 10;
 impl AgentValidator {
     /// Find the project root by looking for .claude directory.
     /// Limited to MAX_TRAVERSAL_DEPTH levels to prevent unbounded traversal.
-    fn find_project_root(path: &Path) -> Option<&Path> {
+    fn find_project_root<'a>(path: &'a Path, fs: &dyn FileSystem) -> Option<&'a Path> {
         let mut current = path.parent();
         let mut depth = 0;
         while let Some(dir) = current {
             if depth >= MAX_TRAVERSAL_DEPTH {
                 break;
             }
-            if dir.join(".claude").exists() {
+            if fs.exists(&dir.join(".claude")) {
                 return Some(dir);
             }
             // Also check if we're inside .claude
@@ -65,7 +65,7 @@ impl AgentValidator {
 
     /// Check if a skill exists at the expected location.
     /// Returns false for invalid skill names (path traversal attempts).
-    fn skill_exists(project_root: &Path, skill_name: &str) -> bool {
+    fn skill_exists(project_root: &Path, skill_name: &str, fs: &dyn FileSystem) -> bool {
         if !Self::is_safe_skill_name(skill_name) {
             return false;
         }
@@ -74,7 +74,7 @@ impl AgentValidator {
             .join("skills")
             .join(skill_name)
             .join("SKILL.md");
-        skill_path.exists()
+        fs.exists(&skill_path)
     }
 }
 
@@ -208,9 +208,10 @@ impl Validator for AgentValidator {
         // CC-AG-005: Referenced skill not found
         if config.is_rule_enabled("CC-AG-005") {
             if let Some(skills) = &schema.skills {
-                if let Some(project_root) = Self::find_project_root(path) {
+                let fs = config.fs();
+                if let Some(project_root) = Self::find_project_root(path, fs.as_ref()) {
                     for skill_name in skills {
-                        if !Self::skill_exists(project_root, skill_name) {
+                        if !Self::skill_exists(project_root, skill_name, fs.as_ref()) {
                             diagnostics.push(
                                 Diagnostic::error(
                                     path.to_path_buf(),
@@ -1226,5 +1227,246 @@ Agent instructions"#;
             .filter(|d| d.rule == "CC-AG-001")
             .collect();
         assert_eq!(cc_ag_001.len(), 1);
+    }
+
+    // ===== MockFileSystem Integration Tests for CC-AG-005 =====
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_missing_skill() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        // Set up directory structure: .claude/agents exists but skill doesn't
+        mock_fs.add_dir("/project/.claude");
+        mock_fs.add_dir("/project/.claude/agents");
+        // No skill directory created
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills:
+  - nonexistent-skill
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics = validator.validate(
+            Path::new("/project/.claude/agents/test-agent.md"),
+            content,
+            &config,
+        );
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        assert_eq!(cc_ag_005.len(), 1);
+        assert!(cc_ag_005[0].message.contains("nonexistent-skill"));
+        assert!(cc_ag_005[0].message.contains("not found"));
+    }
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_existing_skill() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        // Set up complete directory structure with skill
+        mock_fs.add_dir("/project/.claude");
+        mock_fs.add_dir("/project/.claude/agents");
+        mock_fs.add_dir("/project/.claude/skills");
+        mock_fs.add_dir("/project/.claude/skills/my-skill");
+        mock_fs.add_file(
+            "/project/.claude/skills/my-skill/SKILL.md",
+            "---\nname: my-skill\ndescription: A skill\n---\nBody",
+        );
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills:
+  - my-skill
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics = validator.validate(
+            Path::new("/project/.claude/agents/test-agent.md"),
+            content,
+            &config,
+        );
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        // No errors - skill exists
+        assert_eq!(cc_ag_005.len(), 0);
+    }
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_multiple_skills_mixed() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        // Set up structure with one skill present, two missing
+        mock_fs.add_dir("/project/.claude");
+        mock_fs.add_dir("/project/.claude/agents");
+        mock_fs.add_dir("/project/.claude/skills");
+        mock_fs.add_dir("/project/.claude/skills/existing-skill");
+        mock_fs.add_file(
+            "/project/.claude/skills/existing-skill/SKILL.md",
+            "---\nname: existing-skill\ndescription: Exists\n---\nBody",
+        );
+        // missing-skill-1 and missing-skill-2 are not created
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills:
+  - existing-skill
+  - missing-skill-1
+  - missing-skill-2
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics = validator.validate(
+            Path::new("/project/.claude/agents/test-agent.md"),
+            content,
+            &config,
+        );
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        // Should report 2 missing skills
+        assert_eq!(cc_ag_005.len(), 2);
+        let messages: Vec<&str> = cc_ag_005.iter().map(|d| d.message.as_str()).collect();
+        assert!(messages.iter().any(|m| m.contains("missing-skill-1")));
+        assert!(messages.iter().any(|m| m.contains("missing-skill-2")));
+    }
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_path_traversal_rejected() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_dir("/project/.claude");
+        mock_fs.add_dir("/project/.claude/agents");
+        // Even if we create a file at the traversal target, it should be rejected
+        mock_fs.add_file("/etc/passwd", "root:x:0:0:root:/root:/bin/bash");
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills:
+  - ../../../etc/passwd
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics = validator.validate(
+            Path::new("/project/.claude/agents/test-agent.md"),
+            content,
+            &config,
+        );
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        // Path traversal attempts should be rejected as "not found"
+        assert_eq!(cc_ag_005.len(), 1);
+        assert!(cc_ag_005[0].message.contains("not found"));
+    }
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_no_claude_directory() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        // No .claude directory at all
+        mock_fs.add_dir("/project");
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills:
+  - some-skill
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics =
+            validator.validate(Path::new("/project/random/test-agent.md"), content, &config);
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        // Without .claude directory, no project root found, so no CC-AG-005 errors
+        // (can't validate skill references without knowing where to look)
+        assert_eq!(cc_ag_005.len(), 0);
+    }
+
+    #[test]
+    fn test_cc_ag_005_with_mock_fs_empty_skills_array() {
+        use crate::fs::MockFileSystem;
+        use std::sync::Arc;
+
+        let mock_fs = Arc::new(MockFileSystem::new());
+        mock_fs.add_dir("/project/.claude");
+        mock_fs.add_dir("/project/.claude/agents");
+
+        let mut config = LintConfig::default();
+        config.set_fs(mock_fs);
+
+        let content = r#"---
+name: my-agent
+description: A test agent
+skills: []
+---
+Agent instructions"#;
+
+        let validator = AgentValidator;
+        let diagnostics = validator.validate(
+            Path::new("/project/.claude/agents/test-agent.md"),
+            content,
+            &config,
+        );
+
+        let cc_ag_005: Vec<_> = diagnostics
+            .iter()
+            .filter(|d| d.rule == "CC-AG-005")
+            .collect();
+
+        // Empty skills array = no errors
+        assert_eq!(cc_ag_005.len(), 0);
     }
 }
