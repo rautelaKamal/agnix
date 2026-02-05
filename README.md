@@ -44,6 +44,19 @@ agnix validates configs against 100 rules derived from official specs, research 
 
 **Integration**: LSP server, VS Code extension, GitHub Action, auto-fix (`--fix`)
 
+## Security
+
+agnix implements multiple security measures:
+
+- **ReDoS Protection**: Regex operations limited to 64KB input
+- **File Size Limits**: Maximum 1 MiB per file
+- **File Count Limits**: Configurable maximum files (default 10,000)
+- **Symlink Rejection**: Never follows symbolic links
+- **Fuzz Testing**: Continuous fuzzing with cargo-fuzz
+- **Path Traversal Detection**: Import validation prevents directory escape
+
+See [SECURITY.md](SECURITY.md) for reporting vulnerabilities and [knowledge-base/SECURITY-MODEL.md](knowledge-base/SECURITY-MODEL.md) for detailed threat model and implementation.
+
 ## Installation
 
 ```bash

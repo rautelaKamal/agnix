@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- ReDoS protection via regex input size limits (MAX_REGEX_INPUT_SIZE = 64KB)
+  - Markdown XML tag extraction skips oversized content
+  - Cross-platform and prompt engineering validators protected
+- File count limits to prevent DoS attacks
+  - Default limit of 10,000 files (configurable via max_files_to_validate)
+  - CLI flag --max-files to override or disable (--max-files 0)
+- Fuzz testing infrastructure with cargo-fuzz
+  - Three fuzz targets: fuzz_frontmatter, fuzz_markdown, fuzz_json
+  - CI runs 5-minute fuzzing on PRs, 30-minute weekly fuzzing
+  - UTF-8 boundary validation for markdown parsing
+- Enhanced symlink handling documentation and tests
+  - Comprehensive tests for Unix and Windows symlink behavior
+  - MAX_SYMLINK_DEPTH = 40 to prevent circular symlink loops
+- Security integration test suite (crates/agnix-core/tests/security_integration.rs)
+  - Symlink rejection, file size limits, path traversal, file count limits
+  - ReDoS protection validation, concurrent validation safety
+- Hardened dependency management
+  - cargo-audit integration (pinned to v0.21.0) in CI
+  - cargo-deny policy with multiple-versions = deny
+  - audit.toml and deny.toml configuration files
+- Security documentation
+  - SECURITY.md with reporting policy and security configuration
+  - knowledge-base/SECURITY-MODEL.md with threat model and implementation details
+  - Audit history tracking and incident response procedures
+
 ### Added
 - Opt-in telemetry module with privacy-first design (#209)
   - Disabled by default, requires explicit `agnix telemetry enable`

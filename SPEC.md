@@ -46,6 +46,20 @@ The validation process follows these steps:
 
 This architecture ensures fast validation on large projects while maintaining consistent, reproducible output.
 
+## Security
+
+agnix implements defense-in-depth security measures:
+
+| Feature | Implementation | Default |
+|---------|----------------|---------|
+| Symlink rejection | `file_utils::safe_read_file()` | Always on |
+| File size limits | `MAX_FILE_SIZE = 1 MiB` | Always on |
+| File count limits | `max_files_to_validate` | 10,000 |
+| ReDoS protection | `MAX_REGEX_INPUT_SIZE = 64 KB` | Always on |
+| Path traversal detection | `normalize_join()` in imports validator | Always on |
+
+See [knowledge-base/SECURITY-MODEL.md](knowledge-base/SECURITY-MODEL.md) for complete threat model.
+
 ## Rule Reference
 
 All rules in `knowledge-base/VALIDATION-RULES.md`
