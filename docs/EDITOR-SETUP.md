@@ -190,6 +190,7 @@ Open **Settings/Preferences** > **Tools** > **agnix** to configure:
 - **Enable**: Toggle validation on/off
 - **LSP binary path**: Custom path to agnix-lsp (leave empty for auto-detection)
 - **Auto-download**: Automatically download LSP binary if not found
+- **CodeLens**: Show CodeLens annotations
 - **Trace level**: Debug LSP communication (off, messages, verbose)
 
 ### Usage

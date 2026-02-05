@@ -23,7 +23,6 @@ import java.util.zip.ZipInputStream
 class AgnixBinaryDownloader {
 
     private val logger = Logger.getInstance(AgnixBinaryDownloader::class.java)
-    private val resolver = AgnixBinaryResolver()
 
     companion object {
         const val GITHUB_REPO = "avifenesh/agnix"
@@ -96,7 +95,7 @@ class AgnixBinaryDownloader {
         indicator: ProgressIndicator?
     ): String? {
         val downloadUrl = getDownloadUrl(binaryInfo.assetName)
-        val storageDir = resolver.getStorageDirectory()
+        val storageDir = AgnixBinaryResolver.getStorageDirectory()
 
         // Ensure storage directory exists
         if (!storageDir.exists()) {
