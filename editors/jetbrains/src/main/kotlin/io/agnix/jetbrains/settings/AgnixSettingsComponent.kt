@@ -47,55 +47,34 @@ class AgnixSettingsComponent {
             .panel
     }
 
-    /**
-     * Get the main settings panel.
-     */
     fun getPanel(): JComponent = mainPanel
 
-    /**
-     * Get the preferred focus component.
-     */
     fun getPreferredFocusedComponent(): JComponent = enabledCheckBox
 
-    /**
-     * Whether the plugin is enabled.
-     */
     var enabled: Boolean
         get() = enabledCheckBox.isSelected
         set(value) {
             enabledCheckBox.isSelected = value
         }
 
-    /**
-     * The LSP binary path.
-     */
     var lspPath: String
         get() = lspPathField.text
         set(value) {
             lspPathField.text = value
         }
 
-    /**
-     * Whether to auto-download the LSP binary.
-     */
     var autoDownload: Boolean
         get() = autoDownloadCheckBox.isSelected
         set(value) {
             autoDownloadCheckBox.isSelected = value
         }
 
-    /**
-     * The trace level for LSP communication.
-     */
     var traceLevel: AgnixSettings.TraceLevel
         get() = traceLevelComboBox.selectedItem as AgnixSettings.TraceLevel
         set(value) {
             traceLevelComboBox.selectedItem = value
         }
 
-    /**
-     * Whether CodeLens is enabled.
-     */
     var codeLensEnabled: Boolean
         get() = codeLensCheckBox.isSelected
         set(value) {
