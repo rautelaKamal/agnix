@@ -16,8 +16,8 @@ name = "agnix"
 path = "src/main.rs"
 
 [dependencies]
-agnix-core = { path = "../agnix-core", version = "0.1.0" }
-agnix-rules = { path = "../agnix-rules", version = "0.1.0" }
+agnix-core = { path = "../agnix-core", version = "0.2.0" }
+agnix-rules = { path = "../agnix-rules", version = "0.2.0" }
 clap.workspace = true
 colored.workspace = true
 anyhow.workspace = true

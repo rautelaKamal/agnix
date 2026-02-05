@@ -9,7 +9,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Avi Fenesh <avifenesh@gmail.com>"]
@@ -20,7 +20,7 @@ categories = ["development-tools", "command-line-utilities"]
 
 [workspace.dependencies]
 # Internal crates
-agnix-rules = { path = "crates/agnix-rules", version = "0.1.0" }
+agnix-rules = { path = "crates/agnix-rules", version = "0.2.0" }
 
 # Core dependencies
 serde = { version = "1", features = ["derive"] }
