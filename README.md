@@ -1,6 +1,6 @@
 # agnix
 
-[![Crates.io](https://img.shields.io/crates/v/agnix.svg)](https://crates.io/crates/agnix)
+[![Crates.io](https://img.shields.io/crates/v/agnix-cli.svg)](https://crates.io/crates/agnix-cli)
 [![GitHub Release](https://img.shields.io/github/v/release/avifenesh/agnix)](https://github.com/avifenesh/agnix/releases)
 [![CI](https://github.com/avifenesh/agnix/actions/workflows/ci.yml/badge.svg)](https://github.com/avifenesh/agnix/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
@@ -15,7 +15,7 @@ Covers: Skills • MCP • Hooks • Memory • Agents • Plugins • Prompt En
 
 ```bash
 # Install from crates.io
-cargo install agnix
+cargo install agnix-cli
 
 # Run validation
 agnix .
@@ -45,12 +45,14 @@ agnix .
 ### From crates.io (recommended)
 
 ```bash
-cargo install agnix
+cargo install agnix-cli
 ```
 
 ### From source
 
 ```bash
+git clone https://github.com/avifenesh/agnix
+cd agnix
 cargo install --path crates/agnix-cli
 ```
 
