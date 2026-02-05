@@ -149,7 +149,7 @@ Features:
 Example JSON output structure:
 ```json
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "files_checked": 5,
   "diagnostics": [
     {
@@ -195,7 +195,7 @@ Example SARIF output structure:
     "tool": {
       "driver": {
         "name": "agnix",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "informationUri": "https://github.com/avifenesh/agnix",
         "rules": [...]
       }
@@ -564,7 +564,7 @@ agnix/
     └── vscode/            # VS Code extension
 ```
 
-## What's Included (v0.2.0)
+## What's Included (v0.3.0)
 
 - **100 validation rules** across 10+ categories
 - **1000+ tests** ensuring reliability

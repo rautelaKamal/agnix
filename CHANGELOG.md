@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-05
+
+### Added
+- Comprehensive config file tests (30+ new tests)
+- Performance benchmarks for validation pipeline
+- Support for partial config files (only specify fields you need)
+
+### Fixed
+- Config now allows partial files - users can specify only `disabled_rules` without all other fields
+- Windows path false positives - regex patterns (`\n`, `\s`, `\d`) no longer flagged as Windows paths
+- Comma-separated tool parsing - both `Read, Grep` and `Read Write` formats now work
+- Git ref depth check - `refs/remotes/origin/HEAD` no longer flagged as deep file paths
+- Template placeholder links - `{url}`, `{repoUrl}` placeholders skipped in link validation
+- Wiki-style links - single-word links like `[[brackets]]` no longer flagged
+- CHANGELOG.md excluded from validation (not an agent config file)
+- @import/reference false positives - requires file extension for paths with `/`
+
+### Changed
+- README updated for v0.3.0 with accurate config examples and benchmark numbers
+- Installation now uses `cargo install agnix-cli` from crates.io
+
 ## [0.2.0] - 2026-02-05
 
 ### Added
