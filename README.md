@@ -42,7 +42,7 @@ agnix validates configs against 100 rules derived from official specs, research 
 
 **Tools**: Claude Code, Cursor, GitHub Copilot, Codex CLI, AGENTS.md ecosystem
 
-**Integration**: LSP server, VS Code extension, GitHub Action, auto-fix (`--fix`)
+**Integration**: LSP server, VS Code extension, Neovim plugin, GitHub Action, auto-fix (`--fix`)
 
 **Localization**: English, Spanish, Chinese (Simplified) with `--locale` flag
 
@@ -222,6 +222,8 @@ Real-time diagnostics as you type, quick-fix code actions, hover documentation.
 
 **VS Code extension** includes a comprehensive settings UI for configuring all validation options. Changes apply immediately without server restart. See [VS Code extension](editors/vscode/README.md) for details.
 
+**Neovim plugin** with automatic LSP attachment, commands, Telescope integration, and health checks. See [Neovim plugin](editors/neovim/README.md) for details.
+
 See [Editor Setup](docs/EDITOR-SETUP.md) for VS Code, Neovim, Helix, Cursor, and JetBrains status.
 
 ## MCP Server
@@ -335,6 +337,7 @@ crates/
   agnix-mcp/      # MCP server
   agnix-rules/    # Rule metadata
 editors/
+  neovim/         # Neovim plugin
   vscode/         # VS Code extension
   jetbrains/      # JetBrains extension scaffold (WIP)
 knowledge-base/   # 100 rules documentation
@@ -348,6 +351,7 @@ knowledge-base/   # 100 rules documentation
 - **LSP server** for real-time editor diagnostics
 - **MCP server** for AI assistant integration
 - **VS Code extension** with syntax highlighting
+- **Neovim plugin** with LSP integration and Telescope support
 - **JetBrains extension scaffold** under `editors/jetbrains/` (work in progress)
 - **GitHub Action** for CI/CD integration
 - **Auto-fix** infrastructure (--fix, --dry-run, --fix-safe)
@@ -358,7 +362,7 @@ knowledge-base/   # 100 rules documentation
 
 See [GitHub Issues](https://github.com/avifenesh/agnix/issues) for the full roadmap.
 
-**Editor integrations**: Neovim plugin, Zed extension
+**Editor integrations**: Zed extension
 
 **Features**: Documentation website, additional rule categories
 

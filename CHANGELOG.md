@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Prevents path traversal via .. components in non-canonical paths
 
 ### Added
+- Neovim plugin at `editors/neovim/` with full LSP integration (#187)
+  - Automatic LSP attachment to agnix-relevant files
+  - Commands: `:AgnixStart`, `:AgnixStop`, `:AgnixRestart`, `:AgnixInfo`, `:AgnixValidateFile`, `:AgnixShowRules`, `:AgnixFixAll`, `:AgnixFixSafe`, `:AgnixIgnoreRule`, `:AgnixShowRuleDoc`
+  - Optional Telescope integration for rule browsing
+  - `:checkhealth agnix` support
+  - Installation via lazy.nvim, packer.nvim, vim-plug, or manual
 - Research tracking document (`knowledge-base/RESEARCH-TRACKING.md`) with AI tool inventory and monitoring process (#191)
 - Monthly review checklist (`knowledge-base/MONTHLY-REVIEW.md`) with February 2026 review completed (#191)
 - Rule contribution and tool support request issue templates (#191)
