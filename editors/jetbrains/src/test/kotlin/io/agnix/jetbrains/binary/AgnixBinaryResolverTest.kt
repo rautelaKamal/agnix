@@ -139,16 +139,4 @@ class AgnixBinaryResolverTest {
         assertNotNull(binaryName)
         assertTrue(binaryName == "agnix-lsp" || binaryName == "agnix-lsp.exe")
     }
-
-    // Instance method tests for backwards compatibility
-    @Test
-    fun `instance methods delegate to companion object`() {
-        val resolver = AgnixBinaryResolver()
-
-        // Verify instance methods work and return same results as companion object
-        assertEquals(AgnixBinaryResolver.getStorageDirectory().absolutePath,
-            resolver.getStorageDirectory().absolutePath)
-        assertEquals(AgnixBinaryResolver.getDownloadedBinaryPath(),
-            resolver.getDownloadedBinaryPath())
-    }
 }

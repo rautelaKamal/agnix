@@ -3,13 +3,10 @@ package io.agnix.jetbrains.lsp
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.redhat.devtools.lsp4ij.server.ProcessStreamConnectionProvider
-import io.agnix.jetbrains.binary.AgnixBinaryDownloader
 import io.agnix.jetbrains.binary.AgnixBinaryResolver
 import io.agnix.jetbrains.notifications.AgnixNotifications
 import io.agnix.jetbrains.settings.AgnixSettings
 import java.io.File
-import java.io.InputStream
-import java.io.OutputStream
 
 /**
  * LSP server descriptor for agnix.
@@ -22,7 +19,6 @@ class AgnixLspServerDescriptor(
 ) : ProcessStreamConnectionProvider() {
 
     private val logger = Logger.getInstance(AgnixLspServerDescriptor::class.java)
-    private var process: Process? = null
 
     init {
         // Resolve binary path without blocking download - only check existing locations

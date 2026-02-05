@@ -56,13 +56,21 @@ class PlatformInfoTest {
     }
 
     @Test
-    fun `macOS binary info uses ARM binary`() {
+    fun `macOS binary info selects correct architecture`() {
         if (PlatformInfo.getOS() == PlatformInfo.OS.MACOS) {
             val binaryInfo = PlatformInfo.getBinaryInfo()
+            val arch = PlatformInfo.getArch()
 
             assertNotNull(binaryInfo)
             assertTrue(binaryInfo!!.assetName.contains("darwin"))
             assertEquals("agnix-lsp", binaryInfo.binaryName)
+
+            // Verify architecture-specific binary is selected
+            when (arch) {
+                PlatformInfo.Arch.AARCH64 -> assertTrue(binaryInfo.assetName.contains("aarch64"))
+                PlatformInfo.Arch.X86_64 -> assertTrue(binaryInfo.assetName.contains("x86_64"))
+                else -> {} // Unknown arch returns null, covered by other tests
+            }
         }
     }
 

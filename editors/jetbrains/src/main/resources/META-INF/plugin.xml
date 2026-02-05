@@ -88,7 +88,14 @@
             serverId="io.agnix.lsp"
             languageId="json"/>
 
-        <!-- File Pattern Mappings -->
+        <!--
+            File Pattern Mappings
+
+            Note: Some patterns (mcp.json, plugin.json, settings.json) are broader than ideal
+            because LSP4IJ doesn't support path-based patterns. The agnix-lsp server validates
+            the full file path context and gracefully ignores unrelated files (e.g., it won't
+            validate .vscode/settings.json as a Claude hooks file).
+        -->
         <fileNamePatternMapping
             pattern="SKILL.md"
             serverId="io.agnix.lsp"

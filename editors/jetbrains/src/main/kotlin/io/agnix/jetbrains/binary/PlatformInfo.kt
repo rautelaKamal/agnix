@@ -71,12 +71,18 @@ object PlatformInfo {
         val arch = getArch()
 
         return when (os) {
-            OS.MACOS -> {
-                // macOS: Both Intel and ARM can use ARM binary via Rosetta
-                BinaryInfo(
+            OS.MACOS -> when (arch) {
+                // macOS: Select native binary for each architecture
+                // Rosetta only translates x86_64 on ARM, NOT ARM on Intel
+                Arch.AARCH64 -> BinaryInfo(
                     assetName = "agnix-lsp-aarch64-apple-darwin.tar.gz",
                     binaryName = "agnix-lsp"
                 )
+                Arch.X86_64 -> BinaryInfo(
+                    assetName = "agnix-lsp-x86_64-apple-darwin.tar.gz",
+                    binaryName = "agnix-lsp"
+                )
+                else -> null
             }
             OS.LINUX -> when (arch) {
                 Arch.X86_64 -> BinaryInfo(

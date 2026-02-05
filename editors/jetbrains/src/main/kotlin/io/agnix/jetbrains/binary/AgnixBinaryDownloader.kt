@@ -339,18 +339,35 @@ class AgnixBinaryDownloader {
 
         data class TarEntry(val name: String, val size: Long)
 
+        private fun skipFully(n: Long) {
+            var remaining = n
+            while (remaining > 0) {
+                val skipped = `in`.skip(remaining)
+                if (skipped <= 0) {
+                    // skip() returned 0 or negative, read and discard instead
+                    val toRead = minOf(remaining, 8192L).toInt()
+                    val buffer = ByteArray(toRead)
+                    val read = `in`.read(buffer, 0, toRead)
+                    if (read < 0) break
+                    remaining -= read
+                } else {
+                    remaining -= skipped
+                }
+            }
+        }
+
         val nextEntry: TarEntry?
             get() {
                 // Skip remaining bytes of current entry
                 if (currentEntry != null) {
                     val remaining = currentFileSize - bytesRead
                     if (remaining > 0) {
-                        skip(remaining)
+                        skipFully(remaining)
                     }
                     // Skip padding to 512-byte boundary
                     val padding = (512 - (currentFileSize % 512)) % 512
                     if (padding > 0) {
-                        skip(padding)
+                        skipFully(padding)
                     }
                 }
 
