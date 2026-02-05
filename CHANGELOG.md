@@ -77,6 +77,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Organized validation into clear phases with documentation
   - Improved maintainability and testability without changing validation behavior
 
+### Fixed
+- CLI `--fix` now exits with status `0` when all diagnostics are resolved by auto-fixes (#230)
+  - Exit status now reflects post-fix diagnostics for non-dry-run fix modes
+  - Added integration regression test for `--fix` success after full auto-fix
+
 ### Performance
 - Benchmark infrastructure with iai-callgrind for deterministic CI testing (#202)
   - Instruction count benchmarks immune to system load variance
