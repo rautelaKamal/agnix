@@ -13,7 +13,7 @@
 
 Validates AI agent configs across Claude Code, Cursor, GitHub Copilot, Codex CLI, and more.
 
-**100 rules** | **1500+ tests** | **Parallel validation** | **LSP server** | **MCP server**
+**100 rules** | **1600+ tests** | **Parallel validation** | **LSP server** | **MCP server**
 
 ## Why agnix?
 
@@ -294,7 +294,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
 ```
 crates/
-  agnix-core/     # Validation engine (1500+ tests)
+  agnix-core/     # Validation engine (1600+ tests)
   agnix-cli/      # CLI binary
   agnix-lsp/      # Language server
   agnix-mcp/      # MCP server
@@ -308,7 +308,7 @@ knowledge-base/   # 100 rules documentation
 ## What's Included
 
 - **100 validation rules** across 15 categories
-- **1500+ tests** ensuring reliability
+- **1600+ tests** ensuring reliability
 - **CLI** with colored output, JSON/SARIF formats
 - **LSP server** for real-time editor diagnostics
 - **MCP server** for AI assistant integration

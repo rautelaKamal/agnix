@@ -67,7 +67,7 @@ knowledge-base/
 | **Agent Skills** | 12 | 19KB | 36KB | 15 rules |
 | **MCP** | 11 | 33KB | 36KB | 8 rules |
 | **Claude Code** | 10 | 34KB | 40KB | 42 rules |
-| **Multi-Platform** | 15 | 15KB | 27KB | 3 rules |
+| **Multi-Platform** | 15 | 15KB | 27KB | 6 rules |
 | **Prompt Eng** | 15 | 16KB | 21KB | 4 rules |
 | **AGENTS.md** | 5 | - | - | 6 rules |
 | **Cursor** | 2 | - | - | 6 rules |
@@ -246,15 +246,15 @@ Update knowledge base when:
 ## Statistics
 
 ```
-Total Documents:       27 files
-Total Lines:          18,159 lines
-Total Size:           624KB
+Total Documents:       29 files
+Total Lines:          18,534 lines
+Total Size:           636KB
 Standards Covered:     5 (Agent Skills, MCP, Claude Code, Multi-Platform, Prompt Eng)
 Sources Consulted:    75+ (specs, docs, research papers, repos)
 Research Agents:       5 (10+ sources each)
 Validation Rules:     100 rules
 Auto-Fixable Rules:   22 rules
-Test Fixtures:        11 files
+Test Fixtures:        116 files
 Platforms Analyzed:   9 (Claude Code, Codex CLI, OpenCode, Copilot, Cursor, Cline, Roo-Cline, Continue.dev, Aider)
 ```
 
