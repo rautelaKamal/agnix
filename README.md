@@ -1,12 +1,21 @@
 # agnix
 
+[![Crates.io](https://img.shields.io/crates/v/agnix.svg)](https://crates.io/crates/agnix)
+[![GitHub Release](https://img.shields.io/github/v/release/avifenesh/agnix)](https://github.com/avifenesh/agnix/releases)
+[![CI](https://github.com/avifenesh/agnix/actions/workflows/ci.yml/badge.svg)](https://github.com/avifenesh/agnix/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
+
 > The nginx of agent configs
 
-Validate agent specifications across Claude Code, Cursor, Codex, and beyond.
+A production-ready linter for AI agent configurations. Validates specifications across Claude Code, Cursor, GitHub Copilot, Codex CLI, and more.
 
-**Validates:** Skills • MCP • Hooks • Memory • Agents • Plugins
+**100 validation rules** covering: Skills • MCP • Hooks • Memory • Agents • Plugins
 
 ```bash
+# Install from crates.io
+cargo install agnix
+
+# Run validation
 agnix .
 ```
 
@@ -31,17 +40,24 @@ agnix .
 
 ## Installation
 
+### From crates.io (recommended)
+
+```bash
+cargo install agnix
+```
+
 ### From source
 
 ```bash
 cargo install --path crates/agnix-cli
 ```
 
-### From crates.io
+### Pre-built binaries
 
-```bash
-cargo install agnix
-```
+Download from [GitHub Releases](https://github.com/avifenesh/agnix/releases):
+- Linux (x86_64-gnu, x86_64-musl, aarch64)
+- macOS (Apple Silicon)
+- Windows (x86_64)
 
 ## Quick Start
 
@@ -203,7 +219,7 @@ Use the official agnix GitHub Action for seamless CI/CD integration:
 
 ```yaml
 - name: Validate agent configs
-  uses: avifenesh/agnix@v0.1.0
+  uses: avifenesh/agnix@v0
   with:
     target: 'claude-code'
 ```
@@ -239,14 +255,14 @@ Use the official agnix GitHub Action for seamless CI/CD integration:
 
 ```yaml
 - name: Validate agent configs
-  uses: avifenesh/agnix@v0.1.0
+  uses: avifenesh/agnix@v0
 ```
 
 **Strict mode with specific target:**
 
 ```yaml
 - name: Validate Claude Code configs
-  uses: avifenesh/agnix@v0.1.0
+  uses: avifenesh/agnix@v0
   with:
     target: 'claude-code'
     strict: 'true'
@@ -257,7 +273,7 @@ Use the official agnix GitHub Action for seamless CI/CD integration:
 ```yaml
 - name: Validate agent configs
   id: agnix
-  uses: avifenesh/agnix@v0.1.0
+  uses: avifenesh/agnix@v0
   with:
     format: 'sarif'
 
@@ -272,7 +288,7 @@ Use the official agnix GitHub Action for seamless CI/CD integration:
 ```yaml
 - name: Validate agent configs
   id: validate
-  uses: avifenesh/agnix@v0.1.0
+  uses: avifenesh/agnix@v0
   with:
     fail-on-error: 'false'
 
@@ -335,30 +351,34 @@ See `crates/agnix-lsp/README.md` for more editor configurations.
 
 **VS Code:**
 
-Install the agnix extension from the VS Code Marketplace, or build from source:
+Install from source:
 
 ```bash
 cd editors/vscode
 npm install
 npm run compile
+npm run package
 ```
 
-Then use "Install from VSIX" in VS Code or run `code --install-extension agnix-0.1.0.vsix`.
+Then install with `code --install-extension agnix-0.1.0.vsix`.
 
-The extension provides:
+Features:
 - Real-time diagnostics as you type
+- Quick-fix code actions
+- Hover documentation for frontmatter fields
 - Status bar indicator
 - Syntax highlighting for SKILL.md frontmatter
 
-Configure the LSP path in settings if needed:
+Configure in settings:
 
 ```json
 {
-  "agnix.lspPath": "/path/to/agnix-lsp"
+  "agnix.lspPath": "/path/to/agnix-lsp",
+  "agnix.enable": true
 }
 ```
 
-See `editors/vscode/README.md` for full documentation.
+See [`editors/vscode/README.md`](editors/vscode/README.md) for full documentation.
 
 ## Performance
 
@@ -457,12 +477,16 @@ When `target` is set to a specific tool, only relevant rules run:
 | xml | XML-* | XML tag balance |
 | imports | imports::* | Import reference validation |
 
-## Supported Standards
+## Supported Tools & Standards
 
-- **Agent Skills** - [agentskills.io](https://agentskills.io) open standard
-- **MCP** - [Model Context Protocol](https://modelcontextprotocol.io)
-- **Claude Code** - Hooks, Memory, Plugins, Subagents
-- **A2A** - Agent-to-Agent protocol (coming soon)
+| Tool | Rules | File Types |
+|------|-------|------------|
+| [Agent Skills](https://agentskills.io) | AS-*, CC-SK-* | SKILL.md |
+| [Claude Code](https://docs.anthropic.com/en/docs/build-with-claude/claude-code) | CC-* | CLAUDE.md, hooks, agents, plugins |
+| [GitHub Copilot](https://docs.github.com/en/copilot) | COP-* | .github/copilot-instructions.md |
+| [Cursor](https://cursor.com) | CUR-* | .cursor/rules/*.mdc |
+| [MCP](https://modelcontextprotocol.io) | MCP-* | *.mcp.json |
+| [AGENTS.md](https://agentsmd.org) | AGM-*, XP-* | AGENTS.md |
 
 ## Development
 
@@ -512,24 +536,34 @@ agnix/
     └── vscode/            # VS Code extension
 ```
 
+## What's Included (v0.1.0)
+
+- **100 validation rules** across 10 categories
+- **CLI** with colored output, JSON/SARIF formats
+- **LSP server** for real-time editor diagnostics
+- **VS Code extension** with syntax highlighting
+- **GitHub Action** for CI/CD integration
+- **Auto-fix** infrastructure (--fix, --dry-run, --fix-safe)
+- **Parallel validation** for large projects
+- **Cross-platform** support (Linux, macOS, Windows)
+
 ## Roadmap
 
-- [x] Core validation engine
-- [x] CLI with colored output
-- [x] Agent Skills validation (AS-* + CC-SK-001 to CC-SK-009)
-- [x] CLAUDE.md rules
-- [x] XML balance checking
-- [x] @import resolution
-- [x] Hooks validation (CC-HK-001 to CC-HK-011)
-- [x] Agent validation (CC-AG-001 to CC-AG-006)
-- [x] Parallel file validation
-- [x] Config-based rule filtering
-- [x] Auto-fix infrastructure (--fix, --dry-run, --fix-safe)
-- [x] Plugin validation (CC-PL-001 to CC-PL-005)
-- [x] MCP tool validation (MCP-001 to MCP-006)
-- [x] GitHub Action for CI/CD integration
-- [x] LSP server
-- [x] VS Code extension
+See [GitHub Issues](https://github.com/avifenesh/agnix/issues) for the full roadmap. Highlights:
+
+**Editor integrations:**
+- [ ] Neovim plugin (#187)
+- [ ] JetBrains IDE plugin (#196)
+- [ ] Zed extension (#198)
+
+**Distribution:**
+- [ ] Homebrew formula (#193)
+- [ ] Docker image (#200)
+
+**Features:**
+- [ ] Watch mode (#203)
+- [ ] MCP server for AI tools (#189)
+- [ ] Documentation website (#195)
 
 ## License
 
