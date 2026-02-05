@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-02-05
+
+### Fixed
+- VS Code extension LSP installation - now downloads LSP-specific archives (`agnix-lsp-*.tar.gz`)
+  - Fixes "chmod: No such file or directory" error on macOS ARM64 and Linux ARM64
+  - Added binary existence check before chmod for better error messages
+- CC-MEM-006 rule now correctly recognizes positive alternatives before negatives
+  - Pattern "DO X, don't do Y" now accepted (previously incorrectly flagged)
+  - Example: "Fetch web resources fresh, don't rely on cached data" ✓
+
+### Changed
+- Release workflow now builds separate LSP archives for VS Code auto-download
+
+## [0.7.0] - 2026-02-05
+
 ### Changed
 - Refactored LintConfig internal structure for better maintainability (#214)
   - Introduced RuntimeContext struct to group non-serialized state
