@@ -5,6 +5,7 @@ members = [
     "crates/agnix-rules",
     "crates/agnix-cli",
     "crates/agnix-lsp",
+    "crates/agnix-mcp",
     # "crates/agnix-wasm", # Coming later
 ]
 

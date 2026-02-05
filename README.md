@@ -12,7 +12,7 @@
 
 Validates AI agent configs across Claude Code, Cursor, GitHub Copilot, Codex CLI, and more.
 
-**100 rules** | **1250+ tests** | **Parallel validation** | **LSP server**
+**100 rules** | **1250+ tests** | **Parallel validation** | **LSP server** | **MCP server**
 
 ## Why agnix?
 
@@ -159,6 +159,34 @@ Real-time diagnostics as you type, quick-fix code actions, hover documentation.
 
 See [Editor Setup](docs/EDITOR-SETUP.md) for VS Code, Neovim, Helix configuration.
 
+## MCP Server
+
+Expose agnix validation as MCP tools for AI assistants:
+
+```bash
+cargo install agnix-mcp
+```
+
+**Tools available:**
+- `validate_file` - Validate a single config file
+- `validate_project` - Validate all configs in a directory
+- `get_rules` - List all 100 validation rules
+- `get_rule_docs` - Get details about a specific rule
+
+**Claude Desktop configuration:**
+
+```json
+{
+  "mcpServers": {
+    "agnix": {
+      "command": "agnix-mcp"
+    }
+  }
+}
+```
+
+The server follows MCP best practices with rich parameter schemas and structured JSON output.
+
 ## Configuration
 
 ```toml
@@ -210,6 +238,7 @@ crates/
   agnix-core/     # Validation engine (1250+ tests)
   agnix-cli/      # CLI binary
   agnix-lsp/      # Language server
+  agnix-mcp/      # MCP server
   agnix-rules/    # Rule metadata
 editors/
   vscode/         # VS Code extension
@@ -222,6 +251,7 @@ knowledge-base/   # 100 rules documentation
 - **1250+ tests** ensuring reliability
 - **CLI** with colored output, JSON/SARIF formats
 - **LSP server** for real-time editor diagnostics
+- **MCP server** for AI assistant integration
 - **VS Code extension** with syntax highlighting
 - **GitHub Action** for CI/CD integration
 - **Auto-fix** infrastructure (--fix, --dry-run, --fix-safe)
@@ -234,9 +264,7 @@ See [GitHub Issues](https://github.com/avifenesh/agnix/issues) for the full road
 
 **Editor integrations**: Neovim plugin, JetBrains IDE, Zed extension
 
-**Distribution**: Homebrew formula, Docker image
-
-**Features**: Watch mode, MCP server, Documentation website
+**Features**: Documentation website, additional rule categories
 
 ## License
 
