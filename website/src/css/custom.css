@@ -74,3 +74,19 @@ html[data-theme='dark'] .header-github-link::before {
 .prism-code {
   font-size: 0.9rem;
 }
+
+/* Ensure Docusaurus code blocks have visible contrast in light mode */
+:root {
+  --prism-background-color: #f6f8fa;
+  --ifm-code-background: #f0f2f5;
+}
+
+html[data-theme='dark'] {
+  --prism-background-color: #161b22;
+  --ifm-code-background: rgba(110, 118, 129, 0.2);
+}
+
+/* Inline code contrast */
+code {
+  border: 1px solid var(--ag-border);
+}
