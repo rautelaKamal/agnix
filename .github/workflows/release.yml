@@ -285,7 +285,7 @@ jobs:
       - name: Build and publish plugin
         run: ./gradlew publishPlugin
         env:
-          PUBLISH_TOKEN: ${{ secrets.JETBRAINS_PUBLISH_TOKEN }}
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
 
   zed:
     name: Publish Zed Extension
