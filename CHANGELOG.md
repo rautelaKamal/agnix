@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-02-06
+
+### Fixed
+- VS Code extension now probes PATH binaries with `--version` and prefers up-to-date downloaded binary over outdated system installations
+- Version check handles pre-0.9.2 agnix-lsp binaries without `--version` support
+- Reordered `findLspBinary()` to prefer the downloaded binary when its version marker matches, skipping the `--version` probe on subsequent restarts
+
+## [0.9.2] - 2026-02-06
+
+### Added
+- `agnix-lsp --version`/`-V` flag for debugging
+
+### Fixed
+- VS Code and JetBrains plugins now auto-update LSP binary when plugin version changes
+- Plugin writes `.agnix-lsp-version` marker file to detect version mismatches
+- GitHub release URLs use versioned paths instead of `/latest/` for reliable downloads
+
 ## [0.9.1] - 2026-02-06
 
 ### Fixed
