@@ -117,7 +117,22 @@ impl Validator for ImportsValidator {
         );
 
         // Validate markdown links (REF-002)
-        validate_markdown_links(path, content, config, &mut diagnostics, fs.as_ref());
+        // Only check agent config files, not generic markdown. Generic markdown
+        // files (plans, research notes, etc.) commonly have broken relative links
+        // that are project documentation issues, not agent configuration problems.
+        let is_agent_config = matches!(
+            filename,
+            "CLAUDE.md"
+                | "CLAUDE.local.md"
+                | "AGENTS.md"
+                | "AGENTS.local.md"
+                | "AGENTS.override.md"
+                | "SKILL.md"
+        ) || filename.ends_with(".instructions.md")
+            || filename == "copilot-instructions.md";
+        if is_agent_config {
+            validate_markdown_links(path, content, config, &mut diagnostics, fs.as_ref());
+        }
 
         diagnostics
     }
@@ -934,7 +949,8 @@ mod tests {
     #[test]
     fn test_ref_002_broken_link() {
         let temp = TempDir::new().unwrap();
-        let file_path = temp.path().join("test.md");
+        // REF-002 only fires on agent config files, not generic markdown
+        let file_path = temp.path().join("CLAUDE.md");
         fs::write(&file_path, "See [guide](missing.md) for more.").unwrap();
 
         let validator = ImportsValidator;
@@ -1017,7 +1033,8 @@ mod tests {
     #[test]
     fn test_ref_002_missing_file_with_fragment() {
         let temp = TempDir::new().unwrap();
-        let file_path = temp.path().join("test.md");
+        // REF-002 only fires on agent config files, not generic markdown
+        let file_path = temp.path().join("CLAUDE.md");
         fs::write(&file_path, "See [section](missing.md#section) for more.").unwrap();
 
         let validator = ImportsValidator;
@@ -1034,7 +1051,8 @@ mod tests {
     #[test]
     fn test_ref_002_broken_image() {
         let temp = TempDir::new().unwrap();
-        let file_path = temp.path().join("test.md");
+        // REF-002 only fires on agent config files, not generic markdown
+        let file_path = temp.path().join("CLAUDE.md");
         fs::write(&file_path, "![logo](images/logo.png)").unwrap();
 
         let validator = ImportsValidator;
