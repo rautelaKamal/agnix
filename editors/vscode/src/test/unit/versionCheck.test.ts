@@ -4,6 +4,7 @@ import {
   writeVersionMarker,
   isDownloadedBinary,
   buildReleaseUrl,
+  parseLspVersionOutput,
   VERSION_MARKER_FILE,
   type VersionCheckDeps,
 } from '../../version-check';
@@ -127,6 +128,31 @@ describe('buildReleaseUrl', () => {
     assert.strictEqual(
       url,
       'https://github.com/avifenesh/agnix/releases/download/v1.0.0/agnix-lsp-x86_64-pc-windows-msvc.zip'
+    );
+  });
+});
+
+describe('parseLspVersionOutput', () => {
+  it('parses standard version output', () => {
+    assert.strictEqual(parseLspVersionOutput('agnix-lsp 0.9.2'), '0.9.2');
+  });
+
+  it('parses output with trailing newline', () => {
+    assert.strictEqual(parseLspVersionOutput('agnix-lsp 1.0.0\n'), '1.0.0');
+  });
+
+  it('returns null for empty output', () => {
+    assert.strictEqual(parseLspVersionOutput(''), null);
+  });
+
+  it('returns null for unrecognized output', () => {
+    assert.strictEqual(parseLspVersionOutput('some other program 1.0'), null);
+  });
+
+  it('returns null for LSP JSON-RPC output (old binary)', () => {
+    assert.strictEqual(
+      parseLspVersionOutput('Content-Length: 123\r\n'),
+      null
     );
   });
 });

@@ -16,6 +16,7 @@ import {
   writeVersionMarker,
   isDownloadedBinary,
   buildReleaseUrl,
+  parseLspVersionOutput,
 } from './version-check';
 
 const execAsync = promisify(exec);
@@ -374,33 +375,71 @@ async function downloadAndInstallLsp(version?: string): Promise<string | null> {
 }
 
 /**
- * Check if a downloaded binary matches the extension version.
- * Returns the binary path if up-to-date, re-downloads if stale, or null on failure.
- * User-configured or PATH binaries are returned as-is without version checks.
+ * Probe a binary's version by running `<path> --version` with a short timeout.
+ * Returns the version string or null if it fails or times out (old binary).
+ */
+async function probeBinaryVersion(
+  binaryPath: string
+): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync(`"${binaryPath}" --version`, {
+      timeout: 3000,
+    });
+    return parseLspVersionOutput(stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a binary matches the extension version.
+ * For downloaded binaries: checks the version marker file (fast).
+ * For PATH/other binaries: runs --version to probe (spawns process).
+ * Returns the binary path if up-to-date, downloads a matching binary if stale,
+ * or null on failure.
  */
 async function ensureBinaryVersionMatch(
   lspPath: string
 ): Promise<string | null> {
-  const storagePath = extensionContext.globalStorageUri.fsPath;
-  if (!isDownloadedBinary(lspPath, storagePath)) {
-    return lspPath;
-  }
-
   const extensionVersion: string =
     extensionContext.extension.packageJSON.version;
-  const installedVersion = readVersionMarker(storagePath);
+  const storagePath = extensionContext.globalStorageUri.fsPath;
 
-  if (installedVersion === extensionVersion) {
+  if (isDownloadedBinary(lspPath, storagePath)) {
+    // Fast path: check marker file
+    const installedVersion = readVersionMarker(storagePath);
+
+    if (installedVersion === extensionVersion) {
+      outputChannel.appendLine(
+        `agnix-lsp ${installedVersion} matches extension version`
+      );
+      return lspPath;
+    }
+
     outputChannel.appendLine(
-      `agnix-lsp ${installedVersion} matches extension version`
+      installedVersion
+        ? `agnix-lsp version mismatch: binary=${installedVersion}, extension=${extensionVersion}. Updating...`
+        : `No version marker found for agnix-lsp. Updating to ${extensionVersion}...`
+    );
+
+    return downloadAndInstallLsp(extensionVersion);
+  }
+
+  // PATH or user-configured binary: probe with --version
+  const binaryVersion = await probeBinaryVersion(lspPath);
+
+  if (binaryVersion === extensionVersion) {
+    outputChannel.appendLine(
+      `agnix-lsp ${binaryVersion} on PATH matches extension version`
     );
     return lspPath;
   }
 
+  // Old binary (no --version support) or version mismatch -- download correct version
   outputChannel.appendLine(
-    installedVersion
-      ? `agnix-lsp version mismatch: binary=${installedVersion}, extension=${extensionVersion}. Updating...`
-      : `No version marker found for agnix-lsp. Updating to ${extensionVersion}...`
+    binaryVersion
+      ? `agnix-lsp on PATH is ${binaryVersion}, extension needs ${extensionVersion}. Downloading...`
+      : `agnix-lsp on PATH does not support --version (pre-0.9.2). Downloading ${extensionVersion}...`
   );
 
   return downloadAndInstallLsp(extensionVersion);
@@ -408,25 +447,48 @@ async function ensureBinaryVersionMatch(
 
 /**
  * Get the path to agnix-lsp, checking settings, PATH, and global storage.
+ *
+ * Priority:
+ * 1. Downloaded binary with matching version marker (fast, no probe)
+ * 2. Configured path or PATH binary
+ * 3. Downloaded binary without matching marker (will be version-checked later)
  */
 function findLspBinary(): string | null {
+  const platformInfo = getPlatformInfo();
+  const extensionVersion: string =
+    extensionContext.extension.packageJSON.version;
+
+  // Prefer downloaded binary when its version marker matches -- avoids probing old PATH binaries
+  if (platformInfo) {
+    const storageBinary = path.join(
+      extensionContext.globalStorageUri.fsPath,
+      platformInfo.binary
+    );
+    if (fs.existsSync(storageBinary)) {
+      const markerVersion = readVersionMarker(
+        extensionContext.globalStorageUri.fsPath
+      );
+      if (markerVersion === extensionVersion) {
+        return storageBinary;
+      }
+    }
+  }
+
+  // Check configured path / PATH
   const config = vscode.workspace.getConfiguration('agnix');
   const configuredPath = config.get<string>('lspPath', 'agnix-lsp');
-
-  // Check configured path first
   if (checkLspExists(configuredPath)) {
     return configuredPath;
   }
 
-  // Check if we have a downloaded binary in global storage
-  const platformInfo = getPlatformInfo();
+  // Fall back to downloaded binary even without matching marker (will be updated later)
   if (platformInfo) {
-    const storagePath = path.join(
+    const storageBinary = path.join(
       extensionContext.globalStorageUri.fsPath,
       platformInfo.binary
     );
-    if (fs.existsSync(storagePath)) {
-      return storagePath;
+    if (fs.existsSync(storageBinary)) {
+      return storageBinary;
     }
   }
 

@@ -48,3 +48,13 @@ export function buildReleaseUrl(
 ): string {
   return `https://github.com/${repo}/releases/download/v${version}/${asset}`;
 }
+
+/**
+ * Parse the version from `agnix-lsp --version` output.
+ * Expected format: "agnix-lsp X.Y.Z"
+ * Returns the version string or null if it can't be parsed.
+ */
+export function parseLspVersionOutput(output: string): string | null {
+  const match = output.trim().match(/^agnix-lsp\s+(\d+\.\d+\.\d+)/);
+  return match ? match[1] : null;
+}
