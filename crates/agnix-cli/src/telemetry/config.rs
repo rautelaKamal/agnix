@@ -326,8 +326,8 @@ mod tests {
 
         // Restore original state
         match original {
-            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val),
-            None => unsafe { std::env::remove_var("DO_NOT_TRACK"),
+            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val) },
+            None => unsafe { std::env::remove_var("DO_NOT_TRACK") },
         }
     }
 
@@ -358,12 +358,12 @@ mod tests {
 
         // Restore original state
         match original {
-            Some(val) => unsafe { std::env::set_var("AGNIX_TELEMETRY", val),
-            None => unsafe { std::env::remove_var("AGNIX_TELEMETRY"),
+            Some(val) => unsafe { std::env::set_var("AGNIX_TELEMETRY", val) },
+            None => unsafe { std::env::remove_var("AGNIX_TELEMETRY") },
         }
         match original_dnt {
-            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val),
-            None => unsafe { std::env::remove_var("DO_NOT_TRACK"),
+            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val) },
+            None => unsafe { std::env::remove_var("DO_NOT_TRACK") },
         }
     }
 

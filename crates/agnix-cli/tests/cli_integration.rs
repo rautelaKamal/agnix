@@ -838,7 +838,7 @@ fn test_format_sarif_rules_have_help_uri() {
 #[test]
 fn test_format_text_shows_file_location() {
     let mut cmd = agnix();
-    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+    cmd.arg("tests/fixtures/invalid/skills/unknown-tool")
         .assert()
         .failure()
         .stdout(predicate::str::is_match(r"[^:]+:\d+:\d+").unwrap());
@@ -848,7 +848,7 @@ fn test_format_text_shows_file_location() {
 fn test_format_text_shows_error_level() {
     let mut cmd = agnix();
     // Match diagnostic line format: file:line:col error: message
-    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+    cmd.arg("tests/fixtures/invalid/skills/unknown-tool")
         .assert()
         .failure()
         .stdout(predicate::str::is_match(r":\d+:\d+.*error").unwrap());
@@ -892,7 +892,7 @@ fn test_format_text_shows_summary() {
 #[test]
 fn test_format_text_verbose_shows_rule() {
     let mut cmd = agnix();
-    cmd.arg("tests/fixtures/invalid/skills/invalid-name")
+    cmd.arg("tests/fixtures/invalid/skills/unknown-tool")
         .arg("--verbose")
         .assert()
         .failure()
@@ -903,7 +903,7 @@ fn test_format_text_verbose_shows_rule() {
 fn test_format_text_verbose_shows_suggestion() {
     let mut cmd = agnix();
     let output = cmd
-        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("tests/fixtures/invalid/skills/unknown-tool")
         .arg("--verbose")
         .output()
         .unwrap();
@@ -965,7 +965,7 @@ fn test_fix_exit_code_on_remaining_errors() {
     let mut cmd = agnix();
     // Invalid fixtures have errors that cannot be auto-fixed
     let output = cmd
-        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("tests/fixtures/invalid/skills/unknown-tool")
         .arg("--fix")
         .output()
         .unwrap();
@@ -1037,7 +1037,7 @@ fn test_fix_exit_code_when_all_issues_are_fixed() {
 fn test_fix_safe_exit_code() {
     let mut cmd = agnix();
     let output = cmd
-        .arg("tests/fixtures/invalid/skills/invalid-name")
+        .arg("tests/fixtures/invalid/skills/unknown-tool")
         .arg("--fix-safe")
         .output()
         .unwrap();

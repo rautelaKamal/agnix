@@ -1,7 +1,7 @@
 ---
-name: code-review
-description: Use when user wants to Reviews code
-model: gpt-4
+name: completely-wrong-name
+description: Use when user wants to review code
+model: sonnet
 ---
 
 Be helpful when reviewing code.
