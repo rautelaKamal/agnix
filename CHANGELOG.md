@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-02-06
+
 ### Changed
 - Validated against 1,200+ real-world repositories with 71 rules triggered
 - Exclude non-agent markdown files (README.md, docs/, wiki/) from validation
@@ -19,12 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Broaden persona detection in CC-MEM-005 ("You're a senior...")
 - Add PCRE assertions to AS-014 regex escape detection
 - Fix %% formatting in diagnostic messages across all locales
+- Reduce false positive rate from ~30% to <3% across XML, REF, and XP rules
+- Skip type parameters and path template placeholders in XML validation
+- Filter email domains, Java annotations, and social handles from @import detection
 
 ### Added
 - `docs/RELEASING.md` - Release process guide with install target verification
 - `docs/REAL-WORLD-TESTING.md` - Real-world validation and manual inspection guide
 - `scripts/real-world-validate.py` - Batch validation harness
 - `tests/real-world/repos.yaml` - Curated manifest of 1,236 repos
+- Regression test fixtures for HTML5 void elements, type parameters, and absolute paths
 
 ## [0.8.1] - 2026-02-06
 
