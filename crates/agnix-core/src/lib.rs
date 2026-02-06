@@ -22,6 +22,7 @@
 
 rust_i18n::i18n!("../../locales", fallback = "en");
 
+pub mod authoring;
 pub mod config;
 pub mod diagnostics;
 pub mod eval;

@@ -828,6 +828,22 @@ unknownfield: value
     }
 
     #[tokio::test]
+    async fn test_initialize_advertises_completion_capability() {
+        let (service, _socket) = LspService::new(Backend::new);
+
+        let result = service
+            .inner()
+            .initialize(InitializeParams::default())
+            .await
+            .unwrap();
+
+        assert!(
+            result.capabilities.completion_provider.is_some(),
+            "Expected completion capability"
+        );
+    }
+
+    #[tokio::test]
     async fn test_rapid_document_changes() {
         // Test that rapid document changes don't cause issues
         let (service, _socket) = LspService::new(Backend::new);

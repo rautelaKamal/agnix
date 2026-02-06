@@ -1094,6 +1094,33 @@ fn test_cc_hk_004_no_matcher_on_stop_ok() {
 }
 
 #[test]
+fn test_cc_hk_004_has_safe_fix_when_unique_matcher_line() {
+    let content = r#"{
+            "hooks": {
+                "Stop": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [
+                            { "type": "command", "command": "echo 'test'" }
+                        ]
+                    }
+                ]
+            }
+        }"#;
+
+    let diagnostics = validate(content);
+    let cc_hk_004 = diagnostics
+        .iter()
+        .find(|d| d.rule == "CC-HK-004")
+        .expect("CC-HK-004 should be reported");
+
+    assert!(cc_hk_004.has_fixes());
+    let fix = &cc_hk_004.fixes[0];
+    assert!(fix.safe);
+    assert_eq!(fix.replacement, "");
+}
+
+#[test]
 fn test_fixture_matcher_on_wrong_event() {
     let content = include_str!(
         "../../../../../tests/fixtures/invalid/hooks/matcher-on-wrong-event/settings.json"
@@ -1592,6 +1619,33 @@ fn test_cc_hk_011_negative_timeout() {
     assert_eq!(cc_hk_011.len(), 1);
     assert_eq!(cc_hk_011[0].level, DiagnosticLevel::Error);
     assert!(cc_hk_011[0].message.contains("Invalid timeout"));
+}
+
+#[test]
+fn test_cc_hk_011_has_unsafe_fix_for_invalid_timeout() {
+    let content = r#"{
+            "hooks": {
+                "PreToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [
+                            { "type": "command", "command": "echo test", "timeout": -5 }
+                        ]
+                    }
+                ]
+            }
+        }"#;
+
+    let diagnostics = validate(content);
+    let cc_hk_011 = diagnostics
+        .iter()
+        .find(|d| d.rule == "CC-HK-011")
+        .expect("CC-HK-011 should be reported");
+
+    assert!(cc_hk_011.has_fixes());
+    let fix = &cc_hk_011.fixes[0];
+    assert_eq!(fix.replacement, "30");
+    assert!(!fix.safe);
 }
 
 #[test]

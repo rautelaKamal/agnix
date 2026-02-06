@@ -340,6 +340,32 @@ pub(super) fn frontmatter_value_byte_range(
     None
 }
 
+/// Find the full line byte range for a frontmatter key.
+/// Returns (line_start, line_end_exclusive) in full content byte offsets.
+/// Includes the trailing '\n' when present.
+pub(super) fn frontmatter_key_line_byte_range(
+    content: &str,
+    parts: &FrontmatterParts,
+    key: &str,
+) -> Option<(usize, usize)> {
+    let local_key_start = frontmatter_key_offset(&parts.frontmatter, key)?;
+    let abs_start = parts.frontmatter_start + local_key_start;
+    if abs_start >= content.len() {
+        return None;
+    }
+
+    let bytes = content.as_bytes();
+    let mut end = abs_start;
+    while end < content.len() && bytes[end] != b'\n' {
+        end += 1;
+    }
+    if end < content.len() {
+        end += 1;
+    }
+
+    Some((abs_start, end))
+}
+
 pub(super) fn directory_size_until(path: &Path, max_bytes: u64, fs: &dyn FileSystem) -> u64 {
     let mut total = 0u64;
     let mut stack = vec![path.to_path_buf()];

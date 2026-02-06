@@ -42,6 +42,53 @@ pub fn byte_to_position(content: &str, byte_offset: usize) -> Position {
     Position { line, character }
 }
 
+/// Convert an LSP Position (line, character) to a byte offset.
+///
+/// The returned offset is clamped to valid UTF-8 boundaries.
+pub fn position_to_byte(content: &str, position: Position) -> usize {
+    let mut current_line = 0u32;
+    let mut line_start = 0usize;
+
+    for (idx, ch) in content.char_indices() {
+        if current_line == position.line {
+            line_start = idx;
+            break;
+        }
+        if ch == '\n' {
+            current_line += 1;
+            line_start = idx + 1;
+            if current_line == position.line {
+                break;
+            }
+        }
+    }
+
+    if current_line < position.line {
+        return content.len();
+    }
+
+    let line_tail = &content[line_start..];
+    let line_end = line_tail
+        .find('\n')
+        .map(|idx| line_start + idx)
+        .unwrap_or(content.len());
+    let line_content = &content[line_start..line_end];
+
+    let mut char_count = 0u32;
+    for (byte_idx, _) in line_content.char_indices() {
+        if char_count == position.character {
+            return line_start + byte_idx;
+        }
+        char_count += 1;
+    }
+
+    if char_count == position.character {
+        return line_end;
+    }
+
+    line_end
+}
+
 /// Convert a byte range to an LSP Range.
 ///
 /// Creates a Range from start and end byte offsets. Both positions are
@@ -181,5 +228,45 @@ mod tests {
         assert_eq!(range.start.character, 6); // after "name: "
         assert_eq!(range.end.line, 1);
         assert_eq!(range.end.character, 16); // end of "test-skill"
+    }
+
+    #[test]
+    fn test_position_to_byte_same_line() {
+        let content = "hello world";
+        let byte = position_to_byte(
+            content,
+            Position {
+                line: 0,
+                character: 6,
+            },
+        );
+        assert_eq!(byte, 6);
+    }
+
+    #[test]
+    fn test_position_to_byte_multiline() {
+        let content = "hello\nworld";
+        let byte = position_to_byte(
+            content,
+            Position {
+                line: 1,
+                character: 2,
+            },
+        );
+        assert_eq!(byte, 8);
+    }
+
+    #[test]
+    fn test_position_to_byte_utf8() {
+        let content = "aéz";
+        let byte = position_to_byte(
+            content,
+            Position {
+                line: 0,
+                character: 2,
+            },
+        );
+        // 'a' = 1 byte, 'é' = 2 bytes
+        assert_eq!(byte, 3);
     }
 }
