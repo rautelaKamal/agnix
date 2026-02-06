@@ -9,7 +9,7 @@ use crate::regex_util::static_regex;
 static GENERIC_PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
 
 static_regex!(fn negative_pattern, r"(?i)\b(don't|do\s+not|never|avoid|shouldn't|should\s+not)\b");
-static_regex!(fn positive_pattern, r"(?i)\b(instead|rather|prefer|better\s+to|alternative)\b");
+static_regex!(fn positive_pattern, r"(?i)\b(instead|rather|prefer|better\s+to|alternative|always|use\s+\w|ensure|verify|check|open\s+an?\b|run\s+\w|apply|create|add|set|enable)\b");
 static_regex!(fn weak_language_pattern, r"(?i)\b(should|try\s+to|consider|maybe|might\s+want\s+to|could|possibly)\b");
 static_regex!(fn critical_section_pattern, r"(?i)^#+\s*.*(critical|important|required|mandatory|rules|must|essential)");
 static_regex!(fn critical_keyword_pattern, r"(?i)\b(critical|important|must|required|essential|mandatory|crucial)\b");
@@ -142,17 +142,32 @@ pub fn find_negative_without_positive(content: &str) -> Vec<NegativeInstruction>
 
     for (line_num, line) in lines.iter().enumerate() {
         if let Some(mat) = neg_pattern.find(line) {
-            // Check current line for positive alternative using transition words
+            // Check for positive alternative AFTER the negative on the same line
+            // Patterns: "NEVER X - always Y", "don't X, use Y instead"
+            let has_positive_after = if mat.end() < line.len() {
+                let after_negative = &line[mat.end()..];
+                // Look for separator followed by positive language
+                after_negative.contains(" - ")
+                    && pos_pattern.is_match(after_negative)
+                    || after_negative.contains(", ")
+                        && pos_pattern.is_match(after_negative)
+                    || after_negative.contains("; ")
+                        && pos_pattern.is_match(after_negative)
+            } else {
+                false
+            };
+
+            // Check current line for positive transition words
             let has_positive_transition = pos_pattern.is_match(line);
 
             // Check if there's a positive imperative before the negative
             // e.g., "Use X, don't use Y" or "Fetch fresh data, don't cache"
             let has_positive_before = if mat.start() > 0 {
                 let before_negative = &line[..mat.start()].trim();
-                // Look for imperative verb patterns before the negative
-                // Match: starts with verb, contains comma or semicolon before negative
                 before_negative.len() > 5
-                    && (before_negative.contains(',') || before_negative.contains(';'))
+                    && (before_negative.contains(',')
+                        || before_negative.contains(';')
+                        || before_negative.contains(" - "))
                     && !before_negative.starts_with("//")
                     && !before_negative.starts_with('#')
             } else {
@@ -164,7 +179,11 @@ pub fn find_negative_without_positive(content: &str) -> Vec<NegativeInstruction>
                 .get(line_num + 1)
                 .is_some_and(|next| pos_pattern.is_match(next));
 
-            if !has_positive_transition && !has_positive_before && !has_positive_next_line {
+            if !has_positive_transition
+                && !has_positive_before
+                && !has_positive_after
+                && !has_positive_next_line
+            {
                 results.push(NegativeInstruction {
                     line: line_num + 1,
                     column: mat.start() + 1,
@@ -537,6 +556,37 @@ mod tests {
         let content3 = "Don't use var";
         let results3 = find_negative_without_positive(content3);
         assert_eq!(results3.len(), 1, "Standalone negative should trigger");
+    }
+
+    #[test]
+    fn test_negative_with_positive_after_dash() {
+        // "NEVER X - always Y" pattern
+        let content = "NEVER assume - always verify with tests and benchmarks";
+        let results = find_negative_without_positive(content);
+        assert!(results.is_empty(), "NEVER with dash-separated positive should not trigger");
+
+        let content2 = "NEVER ignore bugs, even out of scope - open an issue";
+        let results2 = find_negative_without_positive(content2);
+        assert!(results2.is_empty(), "NEVER with dash-separated action should not trigger");
+    }
+
+    #[test]
+    fn test_negative_with_positive_before_dash() {
+        // "Raise it, but don't change without approval"
+        let content = "Disagree? Raise it, but don't change without approval";
+        let results = find_negative_without_positive(content);
+        assert!(results.is_empty(), "don't with preceding positive context should not trigger");
+    }
+
+    #[test]
+    fn test_standalone_negative_still_triggers() {
+        let content = "Never use global variables";
+        let results = find_negative_without_positive(content);
+        assert_eq!(results.len(), 1, "Standalone NEVER without alternative should trigger");
+
+        let content2 = "Don't hardcode values";
+        let results2 = find_negative_without_positive(content2);
+        assert_eq!(results2.len(), 1, "Standalone don't without alternative should trigger");
     }
 
     // CC-MEM-007 tests
