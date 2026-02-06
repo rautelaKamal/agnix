@@ -91,8 +91,29 @@
   border-radius: 2rem;
 }
 
-.ctaSecondary {
+/* GitHub button: dark filled with icon */
+.ctaGithub {
   border-radius: 2rem;
+  background: #24292f;
+  color: #fff;
+  border: 1px solid #24292f;
+}
+
+.ctaGithub:hover {
+  background: #32383f;
+  color: #fff;
+  text-decoration: none;
+}
+
+html[data-theme='dark'] .ctaGithub {
+  background: #f0f0f0;
+  color: #24292f;
+  border-color: #f0f0f0;
+}
+
+html[data-theme='dark'] .ctaGithub:hover {
+  background: #ffffff;
+  color: #24292f;
 }
 
 /* === Badges === */
@@ -110,6 +131,22 @@
 
 .badges img {
   height: 20px;
+}
+
+.starNudge {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: var(--ag-text-secondary);
+}
+
+.starNudge a {
+  color: var(--ifm-color-primary);
+  text-decoration: none;
+}
+
+.starNudge a:hover {
+  text-decoration: underline;
 }
 
 /* === Terminal Demo === */
