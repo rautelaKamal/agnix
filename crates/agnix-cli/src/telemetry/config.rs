@@ -313,7 +313,7 @@ mod tests {
         let original = std::env::var("DO_NOT_TRACK").ok();
 
         // Set DO_NOT_TRACK and verify telemetry is disabled
-        std::env::set_var("DO_NOT_TRACK", "1");
+        unsafe { std::env::set_var("DO_NOT_TRACK", "1") };
         let config = TelemetryConfig {
             enabled: true,
             installation_id: Some(generate_uuid()),
@@ -326,8 +326,8 @@ mod tests {
 
         // Restore original state
         match original {
-            Some(val) => std::env::set_var("DO_NOT_TRACK", val),
-            None => std::env::remove_var("DO_NOT_TRACK"),
+            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val),
+            None => unsafe { std::env::remove_var("DO_NOT_TRACK"),
         }
     }
 
@@ -338,7 +338,7 @@ mod tests {
         let original_dnt = std::env::var("DO_NOT_TRACK").ok();
 
         // Clear DO_NOT_TRACK to isolate this test
-        std::env::remove_var("DO_NOT_TRACK");
+        unsafe { std::env::remove_var("DO_NOT_TRACK") };
 
         let config = TelemetryConfig {
             enabled: true,
@@ -348,7 +348,7 @@ mod tests {
 
         // Test various override values
         for val in &["0", "false", "no", "off"] {
-            std::env::set_var("AGNIX_TELEMETRY", val);
+            unsafe { std::env::set_var("AGNIX_TELEMETRY", val) };
             assert!(
                 !config.is_enabled(),
                 "AGNIX_TELEMETRY={} should disable telemetry",
@@ -358,12 +358,12 @@ mod tests {
 
         // Restore original state
         match original {
-            Some(val) => std::env::set_var("AGNIX_TELEMETRY", val),
-            None => std::env::remove_var("AGNIX_TELEMETRY"),
+            Some(val) => unsafe { std::env::set_var("AGNIX_TELEMETRY", val),
+            None => unsafe { std::env::remove_var("AGNIX_TELEMETRY"),
         }
         match original_dnt {
-            Some(val) => std::env::set_var("DO_NOT_TRACK", val),
-            None => std::env::remove_var("DO_NOT_TRACK"),
+            Some(val) => unsafe { std::env::set_var("DO_NOT_TRACK", val),
+            None => unsafe { std::env::remove_var("DO_NOT_TRACK"),
         }
     }
 
