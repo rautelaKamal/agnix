@@ -409,9 +409,9 @@ Use environment variables for all platform-specific settings.
         let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
         assert_eq!(xp_003.len(), 1, "XP-003 should fire for CLAUDE.md too");
 
-        // Test generic markdown
+        // Test generic markdown (non-excluded file)
         let diagnostics =
-            validator.validate(Path::new("README.md"), content, &LintConfig::default());
+            validator.validate(Path::new("docs/setup.md"), content, &LintConfig::default());
         let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
         assert_eq!(xp_003.len(), 1, "XP-003 should fire for generic markdown");
     }

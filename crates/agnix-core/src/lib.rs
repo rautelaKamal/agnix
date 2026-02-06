@@ -222,6 +222,39 @@ fn copilot_validator() -> Box<dyn Validator> {
 fn cursor_validator() -> Box<dyn Validator> {
     Box::new(rules::cursor::CursorValidator)
 }
+
+/// Returns true if the file is inside a documentation directory that
+/// is unlikely to contain agent configuration files. This prevents
+/// false positives from XML tags, broken links, and cross-platform
+/// references in project documentation.
+fn is_documentation_directory(path: &Path) -> bool {
+    let path_str = path.to_string_lossy().to_lowercase();
+    // Check if any ancestor directory is a documentation directory
+    for component in path.components() {
+        if let std::path::Component::Normal(name) = component {
+            if let Some(name_str) = name.to_str() {
+                let lower = name_str.to_lowercase();
+                if lower == "docs"
+                    || lower == "doc"
+                    || lower == "documentation"
+                    || lower == "wiki"
+                    || lower == "licenses"
+                    || lower == "examples"
+                    || lower == "api-docs"
+                    || lower == "api_docs"
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    // Check for common documentation path patterns
+    path_str.contains("/docs/")
+        || path_str.contains("/doc/")
+        || path_str.contains("/documentation/")
+        || path_str.contains("/wiki/")
+}
+
 /// Detect file type based on path patterns
 pub fn detect_file_type(path: &Path) -> FileType {
     let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -265,12 +298,36 @@ pub fn detect_file_type(path: &Path) -> FileType {
         // Legacy Cursor rules file (.cursorrules)
         ".cursorrules" => FileType::CursorRulesLegacy,
         name if name.ends_with(".md") => {
-            // Exclude changelog/history files - not agent configs
+            // Exclude common project files that are not agent configurations.
+            // These files commonly contain HTML, @mentions, and cross-platform
+            // references that would produce false positives if validated.
             let lower = name.to_lowercase();
-            if lower == "changelog.md" || lower == "history.md" || lower == "releases.md" {
+            let parent_lower = parent.map(|p| p.to_lowercase());
+            let parent_lower_str = parent_lower.as_deref();
+            if lower == "changelog.md"
+                || lower == "history.md"
+                || lower == "releases.md"
+                || lower == "readme.md"
+                || lower == "contributing.md"
+                || lower == "license.md"
+                || lower == "code_of_conduct.md"
+                || lower == "security.md"
+                || lower == "pull_request_template.md"
+                || lower == "issue_template.md"
+                || lower == "bug_report.md"
+                || lower == "feature_request.md"
+            {
                 FileType::Unknown
             } else if parent == Some("agents") || grandparent == Some("agents") {
                 FileType::Agent
+            } else if is_documentation_directory(path) {
+                // Markdown files in documentation directories are not agent configs
+                FileType::Unknown
+            } else if parent_lower_str == Some(".github")
+                || parent_lower_str == Some("issue_template")
+                || parent_lower_str == Some("pull_request_template")
+            {
+                FileType::Unknown
             } else {
                 FileType::GenericMarkdown
             }
@@ -876,13 +933,81 @@ mod tests {
 
     #[test]
     fn test_detect_generic_markdown() {
+        // Generic markdown in non-excluded directories
         assert_eq!(
-            detect_file_type(Path::new("README.md")),
+            detect_file_type(Path::new("notes/setup.md")),
             FileType::GenericMarkdown
         );
         assert_eq!(
-            detect_file_type(Path::new("docs/guide.md")),
+            detect_file_type(Path::new("plans/feature.md")),
             FileType::GenericMarkdown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("research/analysis.md")),
+            FileType::GenericMarkdown
+        );
+    }
+
+    #[test]
+    fn test_detect_excluded_project_files() {
+        // Common project files should be Unknown, not GenericMarkdown
+        assert_eq!(
+            detect_file_type(Path::new("README.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("CONTRIBUTING.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("LICENSE.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("CODE_OF_CONDUCT.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("SECURITY.md")),
+            FileType::Unknown
+        );
+        // Case insensitive
+        assert_eq!(
+            detect_file_type(Path::new("readme.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("Readme.md")),
+            FileType::Unknown
+        );
+    }
+
+    #[test]
+    fn test_detect_excluded_documentation_directories() {
+        // Files in docs/ directories should be Unknown
+        assert_eq!(
+            detect_file_type(Path::new("docs/guide.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("doc/api.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("documentation/setup.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("docs/descriptors/some-linter.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("wiki/getting-started.md")),
+            FileType::Unknown
+        );
+        assert_eq!(
+            detect_file_type(Path::new("examples/basic.md")),
+            FileType::Unknown
         );
     }
 
@@ -3585,7 +3710,7 @@ Use idiomatic Rust patterns.
         }
 
         let temp = tempfile::TempDir::new().unwrap();
-        std::fs::write(temp.path().join("README.md"), "See @missing.md").unwrap();
+        std::fs::write(temp.path().join("notes.md"), "See @missing.md").unwrap();
 
         let mut registry = ValidatorRegistry::new();
         registry.register(FileType::GenericMarkdown, create_poison_validator);
