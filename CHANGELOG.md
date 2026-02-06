@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Zed editor extension with automatic LSP binary download and MDC file type support (#198)
 - Documentation website pipeline (#195)
   - Added Docusaurus website under `website/` with versioned docs and local search
   - Added rule-doc generation from `knowledge-base/rules.json` via `scripts/generate-docs-rules.py`
