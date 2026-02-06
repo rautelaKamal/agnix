@@ -313,7 +313,7 @@ impl Validator for HooksValidator {
             validate_cc_hk_011_invalid_timeout_values(&raw_value, path, &mut diagnostics);
         }
 
-        let settings: SettingsSchema = match serde_json::from_str(content) {
+        let settings: SettingsSchema = match serde_json::from_value(raw_value) {
             Ok(s) => s,
             Err(e) => {
                 if config.is_rule_enabled("CC-HK-012") {
