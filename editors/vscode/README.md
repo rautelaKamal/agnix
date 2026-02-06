@@ -17,7 +17,7 @@ Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/item
 - **Ignore rules** - Disable rules directly from the editor
 - **Multi-tool** - Claude Code, Cursor, GitHub Copilot, Codex CLI
 
-![Validation in action](https://raw.githubusercontent.com/avifenesh/agnix/main/assets/vscode-validation.png)
+![Validation in action](assets/vscode-validation.png)
 
 ## Supported File Types
 
