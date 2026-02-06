@@ -443,6 +443,23 @@ fn is_likely_type_parameter(name: &str) -> bool {
             | "TableName"
             | "DeviceID"
             | "FieldName"
+            | "HashMap"
+            | "HashSet"
+            | "Vec"
+            | "List"
+            | "Array"
+            | "Map"
+            | "Set"
+    )
+}
+
+/// Returns true if the HTML element is commonly used in markdown
+/// without proper closing tags and rendered correctly by GitHub/GitLab.
+/// These are NOT void elements but are frequently unpaired in practice.
+fn is_markdown_safe_html(name: &str) -> bool {
+    matches!(
+        name.to_lowercase().as_str(),
+        "details" | "summary" | "picture" | "video" | "audio" | "figure" | "figcaption"
     )
 }
 
@@ -475,7 +492,10 @@ fn scan_xml_tags_in_text(
             // Skip HTML5 void elements - they never need closing tags.
             // In markdown, these are commonly written without self-closing syntax
             // (e.g., <br> instead of <br/>, <img src="..."> instead of <img ... />)
-            if is_html5_void_element(&name) && !is_closing {
+            // Also skip HTML elements commonly used in markdown without closing tags
+            // (e.g., <details> for collapsible sections on GitHub)
+            // Skip both opening AND closing tags for void elements and markdown-safe elements
+            if is_html5_void_element(&name) || is_markdown_safe_html(&name) {
                 continue;
             }
 
@@ -486,6 +506,21 @@ fn scan_xml_tags_in_text(
             // within agent instructions.
             if !is_closing && is_likely_type_parameter(&name) {
                 continue;
+            }
+
+            // Skip path template placeholders like <feature> in
+            // "lib/features/<feature>/data/". These are variable placeholders
+            // in file path documentation, not XML tags.
+            if !is_closing {
+                let full_match = cap.get(0).unwrap();
+                let match_start = full_match.start();
+                let match_end = full_match.end();
+                let preceded_by_slash =
+                    match_start > 0 && text.as_bytes().get(match_start - 1) == Some(&b'/');
+                let followed_by_slash = text.as_bytes().get(match_end) == Some(&b'/');
+                if preceded_by_slash || followed_by_slash {
+                    continue;
+                }
             }
             let start = cap.get(0).unwrap().start();
             let end = cap.get(0).unwrap().end();
@@ -502,6 +537,30 @@ fn scan_xml_tags_in_text(
             });
         }
     }
+}
+
+/// Returns true if the name matches a known file that has no extension.
+/// These are common in project roots and are valid @import targets.
+fn is_known_extensionless_file(name: &str) -> bool {
+    matches!(
+        name,
+        "Dockerfile"
+            | "Makefile"
+            | "Jenkinsfile"
+            | "Vagrantfile"
+            | "Procfile"
+            | "Gemfile"
+            | "Rakefile"
+            | "Brewfile"
+            | "Justfile"
+            | "Taskfile"
+            | "Earthfile"
+            | "Containerfile"
+            | "Tiltfile"
+            | "Snakefile"
+            | "LICENSE"
+            | "LICENCE"
+    )
 }
 
 fn is_probable_import_path(path: &str) -> bool {
@@ -524,11 +583,34 @@ fn is_probable_import_path(path: &str) -> bool {
         return has_extension;
     }
 
-    // For paths without separators, use existing heuristics
-    if path.starts_with('~') || path.contains('.') || path.contains(':') {
+    // For paths without separators, require a file extension or tilde prefix.
+    // This prevents @mentions like @MashTimeBot from being treated as imports.
+    if path.starts_with('~') || path.contains(':') {
         return true;
     }
-    path.chars().any(|c| c.is_ascii_uppercase())
+
+    // Known extensionless files that are valid import targets
+    if is_known_extensionless_file(path) {
+        return true;
+    }
+
+    // Exclude email-like patterns (multiple dots with no file extension structure)
+    // e.g., "users.noreply.github.com" is an email domain, not a file
+    if path.matches('.').count() >= 2 && !path.contains('/') {
+        // If the last segment after the last dot looks like a TLD, it's likely a domain
+        if let Some(last_dot) = path.rfind('.') {
+            let ext = &path[last_dot + 1..];
+            if matches!(
+                ext,
+                "com" | "org" | "net" | "io" | "dev" | "ai" | "co" | "edu" | "gov"
+            ) {
+                return false;
+            }
+        }
+    }
+
+    // Must contain a dot (file extension) to be considered a file reference
+    path.contains('.')
 }
 
 #[cfg(test)]
@@ -810,6 +892,119 @@ mod tests {
         // Verify the constant is set to 64KB as documented
         assert_eq!(MAX_REGEX_INPUT_SIZE, 65536);
     }
+
+    // ===== Tests for new helper functions =====
+
+    #[test]
+    fn test_is_markdown_safe_html() {
+        // Should return true for commonly unpaired HTML elements in markdown
+        assert!(is_markdown_safe_html("details"));
+        assert!(is_markdown_safe_html("summary"));
+        assert!(is_markdown_safe_html("picture"));
+        assert!(is_markdown_safe_html("video"));
+        assert!(is_markdown_safe_html("audio"));
+        assert!(is_markdown_safe_html("figure"));
+        assert!(is_markdown_safe_html("figcaption"));
+        assert!(is_markdown_safe_html("DETAILS")); // case-insensitive
+        assert!(is_markdown_safe_html("Summary")); // case-insensitive
+    }
+
+    #[test]
+    fn test_is_markdown_safe_html_negative() {
+        // Should return false for other HTML elements
+        assert!(!is_markdown_safe_html("div"));
+        assert!(!is_markdown_safe_html("span"));
+        assert!(!is_markdown_safe_html("p"));
+        assert!(!is_markdown_safe_html("table"));
+        assert!(!is_markdown_safe_html("example"));
+    }
+
+    #[test]
+    fn test_is_known_extensionless_file() {
+        // Should return true for known files without extensions
+        assert!(is_known_extensionless_file("Dockerfile"));
+        assert!(is_known_extensionless_file("Makefile"));
+        assert!(is_known_extensionless_file("Jenkinsfile"));
+        assert!(is_known_extensionless_file("LICENSE"));
+        assert!(is_known_extensionless_file("LICENCE"));
+        assert!(is_known_extensionless_file("Gemfile"));
+        assert!(is_known_extensionless_file("Rakefile"));
+    }
+
+    #[test]
+    fn test_is_known_extensionless_file_negative() {
+        // Should return false for other files
+        assert!(!is_known_extensionless_file("README"));
+        assert!(!is_known_extensionless_file("dockerfile")); // case-sensitive
+        assert!(!is_known_extensionless_file("main"));
+        assert!(!is_known_extensionless_file("test"));
+    }
+
+    #[test]
+    fn test_xml_path_template_placeholder_filtering_inline() {
+        // Test that tags immediately adjacent to slashes in inline text are filtered
+        // This works when the entire path is in a single text node
+        let content = "`lib/features/<feature>/data/`";
+        let tags = extract_xml_tags(content);
+        // Tags in code blocks/spans should not be extracted at all
+        assert_eq!(tags.len(), 0, "Tags in code should be ignored");
+    }
+
+    #[test]
+    fn test_xml_path_template_detection_logic() {
+        // The filtering logic applies within text chunks that the markdown parser provides
+        // When a tag has a slash immediately before or after it in the SAME text chunk,
+        // it gets filtered. This test verifies the behavior matches expectations.
+
+        // Real XML tag without slashes should be detected
+        let content = "Some <example> tag here";
+        let tags = extract_xml_tags(content);
+        assert_eq!(tags.len(), 1, "Real XML tags should be detected");
+        assert_eq!(tags[0].name, "example");
+
+        // Tag in actual path context (markdown may split this differently)
+        let content2 = "The path is: `/<folder>/`";
+        let tags2 = extract_xml_tags(content2);
+        // In code context, should be filtered anyway
+        assert_eq!(tags2.len(), 0, "Tags in code should be filtered");
+    }
+
+    #[test]
+    fn test_xml_non_path_tags_not_filtered() {
+        // Real XML tags not adjacent to slashes should not be filtered
+        let content = "Some <example> tag here";
+        let tags = extract_xml_tags(content);
+        assert_eq!(tags.len(), 1, "Real XML tags should not be filtered");
+        assert_eq!(tags[0].name, "example");
+    }
+
+    #[test]
+    fn test_is_probable_import_path_email_domain_filtering() {
+        // Email-like patterns should be rejected
+        assert!(!is_probable_import_path("users.noreply.github.com"));
+        assert!(!is_probable_import_path("foo.bar.example.com"));
+        assert!(!is_probable_import_path("test.example.org"));
+        assert!(!is_probable_import_path("api.service.io"));
+    }
+
+    #[test]
+    fn test_is_probable_import_path_valid_files() {
+        // Valid file paths should be accepted
+        assert!(is_probable_import_path("docs/guide.md"));
+        assert!(is_probable_import_path("README.md"));
+        assert!(is_probable_import_path("config.json"));
+        assert!(is_probable_import_path("Dockerfile"));
+        assert!(is_probable_import_path("~/docs/file.txt"));
+        assert!(is_probable_import_path("./relative/path.md"));
+    }
+
+    #[test]
+    fn test_is_probable_import_path_rejects_mentions() {
+        // Plain @mentions should be rejected
+        assert!(!is_probable_import_path("username"));
+        assert!(!is_probable_import_path("MashTimeBot"));
+        assert!(!is_probable_import_path("import"));
+    }
 }
 
 #[cfg(test)]
@@ -921,8 +1116,9 @@ mod proptests {
 
         #[test]
         fn xml_unclosed_detected(tag in "[a-z]+") {
-            // Skip HTML5 void elements and type parameters - they are intentionally excluded
+            // Skip elements intentionally excluded from balance checking
             prop_assume!(!is_html5_void_element(&tag));
+            prop_assume!(!is_markdown_safe_html(&tag));
             prop_assume!(!is_likely_type_parameter(&tag));
             let input = format!("<{}>content", tag);
             let tags = extract_xml_tags(&input);

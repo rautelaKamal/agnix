@@ -21,6 +21,7 @@ pub(super) fn extract_reference_paths(body: &str) -> Vec<PathMatch> {
     let mut paths = Vec::new();
     let mut seen = HashSet::new();
     for m in re.find_iter(body) {
+        #[allow(clippy::collapsible_if)]
         if let Some((trimmed, delta)) = trim_path_token_with_offset(m.as_str()) {
             if seen.insert(trimmed.clone()) {
                 paths.push(PathMatch {
@@ -39,7 +40,8 @@ pub(super) fn is_regex_escape(s: &str) -> bool {
     // \n \s \d \w \t \r \b \| \. \/ \$ \^ \+ \* \? \{ \} \[ \] \( \)
     static REGEX_ESCAPE_CHARS: &[char] = &[
         'n', 's', 'd', 'w', 't', 'r', 'b', '|', '.', '/', '$', '^', '+', '*', '?', '{', '}', '[',
-        ']', '(', ')', 'S', 'D', 'W', 'B',
+        ']', '(', ')', 'S', 'D', 'W', 'B', // PCRE-specific assertions and features
+        'K', 'A', 'Z', 'z', 'G', 'p', 'P', 'x', 'X',
     ];
 
     // Check if this looks like a regex pattern (contains common regex escapes)

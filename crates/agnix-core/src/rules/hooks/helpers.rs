@@ -63,6 +63,14 @@ fn dangerous_patterns() -> &'static Vec<DangerousPattern> {
             ),
             (r"mkfs\.", "Formatting filesystem destroys all data"),
             (r"dd\s+if=.*of=/dev/", "dd to device can destroy data"),
+            (
+                r"\|\|\s*true\s*$",
+                "Error suppression with '|| true' silently hides hook failures",
+            ),
+            (
+                r"2>\s*/dev/null",
+                "Redirecting stderr to /dev/null hides error messages",
+            ),
         ];
         patterns
             .iter()
@@ -335,6 +343,16 @@ pub(super) fn extract_script_paths(command: &str) -> Vec<String> {
                 if path.contains("://") || path.starts_with("http") {
                     continue;
                 }
+                // Skip regex patterns and glob patterns that happen to end in
+                // script extensions (e.g., `\.py$`, `*.js`, `[^/]*.sh`)
+                if path.starts_with('\\')
+                    || path.starts_with('[')
+                    || path.starts_with('*')
+                    || path.starts_with('(')
+                    || path.contains("]*")
+                {
+                    continue;
+                }
                 paths.push(path.to_string());
             }
         }
@@ -453,4 +471,82 @@ fn find_unique_matcher_line_span(content: &str, matcher_value: &str) -> Option<(
         return None;
     }
     Some((first.start(), first.end()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_dangerous_patterns_error_suppression() {
+        // Test || true pattern
+        let result = check_dangerous_patterns("some_command || true");
+        assert!(result.is_some(), "Should detect || true pattern");
+        let (pattern, reason) = result.unwrap();
+        assert!(pattern.contains("true"));
+        assert!(reason.contains("silently hides"));
+    }
+
+    #[test]
+    fn test_check_dangerous_patterns_stderr_redirect() {
+        // Test 2>/dev/null pattern
+        let result = check_dangerous_patterns("command 2>/dev/null");
+        assert!(result.is_some(), "Should detect 2>/dev/null pattern");
+        let (pattern, reason) = result.unwrap();
+        assert!(pattern.contains("2>"));
+        assert!(reason.contains("hides error"));
+    }
+
+    #[test]
+    fn test_check_dangerous_patterns_safe_commands() {
+        // Commands without dangerous patterns should return None
+        assert!(check_dangerous_patterns("echo hello").is_none());
+        assert!(check_dangerous_patterns("npm install").is_none());
+        assert!(check_dangerous_patterns("cargo build").is_none());
+    }
+
+    #[test]
+    fn test_extract_script_paths_basic() {
+        // Test basic script path extraction
+        let paths = extract_script_paths("./scripts/test.sh");
+        assert_eq!(paths.len(), 1);
+        assert_eq!(paths[0], "./scripts/test.sh");
+    }
+
+    #[test]
+    fn test_extract_script_paths_multiple() {
+        // Test multiple scripts
+        let paths = extract_script_paths("run setup.sh && execute deploy.py");
+        assert_eq!(paths.len(), 2);
+        assert!(paths.contains(&"setup.sh".to_string()));
+        assert!(paths.contains(&"deploy.py".to_string()));
+    }
+
+    #[test]
+    fn test_extract_script_paths_filters_regex() {
+        // Should filter out regex patterns ending in script extensions
+        let paths = extract_script_paths(r"find . -name '\.py$'");
+        assert!(paths.is_empty(), "Should filter regex patterns");
+    }
+
+    #[test]
+    fn test_extract_script_paths_filters_glob() {
+        // Should filter out glob patterns
+        let paths = extract_script_paths("process *.js files");
+        assert!(paths.is_empty(), "Should filter glob patterns");
+    }
+
+    #[test]
+    fn test_extract_script_paths_filters_bracket_patterns() {
+        // Should filter out bracket patterns
+        let paths = extract_script_paths("match [^/]*.sh pattern");
+        assert!(paths.is_empty(), "Should filter bracket patterns");
+    }
+
+    #[test]
+    fn test_extract_script_paths_filters_urls() {
+        // Should filter out URLs
+        let paths = extract_script_paths("download https://example.com/script.sh");
+        assert!(paths.is_empty(), "Should filter URLs");
+    }
 }

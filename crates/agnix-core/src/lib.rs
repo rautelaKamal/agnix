@@ -1,3 +1,7 @@
+// The if-let pattern `if config.is_rule_enabled("X") { if condition { ... } }`
+// is used intentionally throughout validators for readability.
+#![allow(clippy::collapsible_if)]
+
 //! # agnix-core
 //!
 //! Core validation engine for agent configurations.
@@ -155,7 +159,11 @@ impl ValidatorRegistry {
             (FileType::CopilotScoped, copilot_validator),
             (FileType::CopilotScoped, xml_validator),
             (FileType::CursorRule, cursor_validator),
+            (FileType::CursorRule, prompt_validator),
+            (FileType::CursorRule, claude_md_validator),
             (FileType::CursorRulesLegacy, cursor_validator),
+            (FileType::CursorRulesLegacy, prompt_validator),
+            (FileType::CursorRulesLegacy, claude_md_validator),
             (FileType::GenericMarkdown, cross_platform_validator),
             (FileType::GenericMarkdown, xml_validator),
             (FileType::GenericMarkdown, imports_validator),
@@ -292,8 +300,8 @@ pub fn detect_file_type(path: &Path) -> FileType {
         {
             FileType::CursorRule
         }
-        // Legacy Cursor rules file (.cursorrules)
-        ".cursorrules" => FileType::CursorRulesLegacy,
+        // Legacy Cursor rules file (.cursorrules or .cursorrules.md)
+        ".cursorrules" | ".cursorrules.md" => FileType::CursorRulesLegacy,
         name if name.ends_with(".md") => {
             // Agent directories take precedence over filename exclusions.
             // Files like agents/README.md should be validated as agent configs.
@@ -3033,6 +3041,15 @@ Use idiomatic Rust patterns.
             detect_file_type(Path::new("project/.cursorrules")),
             FileType::CursorRulesLegacy
         );
+        // Also test .cursorrules.md variant
+        assert_eq!(
+            detect_file_type(Path::new(".cursorrules.md")),
+            FileType::CursorRulesLegacy
+        );
+        assert_eq!(
+            detect_file_type(Path::new("project/.cursorrules.md")),
+            FileType::CursorRulesLegacy
+        );
     }
 
     #[test]
@@ -3053,10 +3070,10 @@ Use idiomatic Rust patterns.
         let registry = ValidatorRegistry::with_defaults();
 
         let cursor_validators = registry.validators_for(FileType::CursorRule);
-        assert_eq!(cursor_validators.len(), 1); // cursor only
+        assert_eq!(cursor_validators.len(), 3); // cursor + prompt + claude_md
 
         let legacy_validators = registry.validators_for(FileType::CursorRulesLegacy);
-        assert_eq!(legacy_validators.len(), 1); // cursor only
+        assert_eq!(legacy_validators.len(), 3); // cursor + prompt + claude_md
     }
 
     #[test]
