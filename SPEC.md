@@ -34,8 +34,10 @@ agnix/
 │   ├── agnix-cli/      # CLI binary
 │   ├── agnix-lsp/      # LSP server
 │   └── agnix-mcp/      # MCP server
-├── editors/            # VS Code + JetBrains scaffold
+├── editors/            # Neovim, VS Code, JetBrains, Zed integrations
 ├── knowledge-base/     # 100 rules documented
+├── scripts/            # Build/dev automation scripts
+├── website/            # Docusaurus documentation website
 └── tests/fixtures/     # Test cases
 ```
 
@@ -227,7 +229,7 @@ Version awareness (`VER-*`) is always active and controlled through `tool_versio
 - **Parallel validation**: Uses rayon `par_bridge()` for file processing across all CPU cores
 - **Registry caching**: ValidatorRegistry is constructed once and shared (7x speedup vs per-file)
 - **Import cache**: `Arc<RwLock<HashMap>>` shared across files reduces redundant @import parsing
-- **Static regex patterns**: OnceLock for one-time initialization of regex patterns
+- **Static regex patterns**: `static_regex!` macro (in `regex_util.rs`) wraps OnceLock for one-time initialization with descriptive panic messages
 - **Directory walking**: Sequential via `ignore` crate (required for .gitignore compatibility)
 - **Deterministic output**: Results sorted by severity then path for reproducible runs
 

@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Zed editor extension with automatic LSP binary download and MDC file type support (#198)
+- Documentation website pipeline (#195)
+  - Added Docusaurus website under `website/` with versioned docs and local search
+  - Added rule-doc generation from `knowledge-base/rules.json` via `scripts/generate-docs-rules.py`
+  - Added docs parity test (`crates/agnix-cli/tests/docs_website_parity.rs`) and CI workflow (`.github/workflows/docs-site.yml`)
+- CI: code coverage reporting with cargo-llvm-cov and Codecov integration (#238)
 - JetBrains plugin: archive extraction tests for AgnixBinaryDownloader (#255)
   - 19 tests covering TAR.GZ/ZIP extraction, binary selection, path traversal protection
   - Refactored extraction methods to companion object for testability
@@ -26,7 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - IDE locale setting: VS Code (`agnix.locale`), Neovim plugin, and LSP config bridge
     - Supports explicit null to revert to auto-detection
 
+### Changed
+- Core: introduce `static_regex!` macro for validated regex initialization (#246)
+  - Replaces bare `.unwrap()` on `Regex::new()` with descriptive `.expect()` messages
+  - Migrates 36 `OnceLock<Regex>` patterns across 7 files to use the macro
+  - Converts `hooks.rs` from `once_cell::sync::Lazy` to `std::sync::OnceLock`
+  - Removes `once_cell` direct dependency from agnix-core
+  - Adds per-module `test_regex_patterns_compile` tests for all static patterns
+
 ### Fixed
+- CLI: harden telemetry queue timestamp parsing against malformed data (#231)
+  - Replace panic-prone byte-index slicing with safe `str::get()` calls
+  - Add ASCII guard, separator validation, and range checks (year, month-aware day bounds, hour, minute, second)
+  - Use `checked_sub` for day arithmetic to prevent u32 underflow
 - Config validation: accept VER-* prefix in disabled_rules (#233)
 - VS Code extension: harden `downloadFile()` cleanup for stream and HTTP failure paths (#240)
   - Closes file/request handles on failure
@@ -37,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Non-feature builds route telemetry calls through `telemetry_stub` no-op facade
   - Added stub-path unit tests and validated both feature and non-feature builds
 - LSP backend now uses shared `Arc<String>` document cache entries to avoid full-text cloning on `did_change`, `did_save`, `codeAction`, and `hover` paths (#244)
+- LSP now revalidates open documents with bounded concurrency on config changes and drops stale diagnostics from outdated config/content snapshots (#243)
 ### Security
 - ReDoS protection via regex input size limits (MAX_REGEX_INPUT_SIZE = 64KB)
   - Markdown XML tag extraction skips oversized content
@@ -119,6 +138,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced main validate() method from ~480 to ~210 lines
   - Organized validation into clear phases with documentation
   - Improved maintainability and testability without changing validation behavior
+- Split Hook and Skill validator modules into focused files (#242)
+  - Replaced monolithic `rules/hooks.rs` and `rules/skill.rs` with `rules/hooks/{mod,helpers,tests}.rs` and `rules/skill/{mod,helpers,tests}.rs`
+  - No validation behavior changes; refactor is layout-only for maintainability
 
 ### Fixed
 - CLI `--fix` now exits with status `0` when all diagnostics are resolved by auto-fixes (#230)
