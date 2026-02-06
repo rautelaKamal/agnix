@@ -24,6 +24,12 @@ pub fn generic_patterns() -> &'static Vec<Regex> {
             Regex::new(r"(?i)\bprovide.*clear.*explanations").unwrap(),
             Regex::new(r"(?i)\bmake\s+sure\s+to").unwrap(),
             Regex::new(r"(?i)\balways\s+be").unwrap(),
+            // Role-play identity preambles
+            Regex::new(r"(?i)^#+\s*(?:you\s+are|your\s+role)").unwrap(),
+            Regex::new(r"(?i)^-?\s*(?:you\s+are\s+a\s+(?:helpful|expert|senior|skilled|experienced))").unwrap(),
+            // Generic programming principles without project context
+            Regex::new(r"(?i)\bfollow\s+(?:best\s+practices|coding\s+standards|clean\s+code)").unwrap(),
+            Regex::new(r"(?i)\bwrite\s+clean\s+(?:and\s+)?(?:maintainable|readable)\s+code").unwrap(),
         ]
     })
 }

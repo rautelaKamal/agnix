@@ -22,6 +22,7 @@ static CLAUDE_HOOKS_PATTERN: OnceLock<Regex> = OnceLock::new();
 static CONTEXT_FORK_PATTERN: OnceLock<Regex> = OnceLock::new();
 static AGENT_FIELD_PATTERN: OnceLock<Regex> = OnceLock::new();
 static ALLOWED_TOOLS_PATTERN: OnceLock<Regex> = OnceLock::new();
+static AT_IMPORT_PATTERN: OnceLock<Regex> = OnceLock::new();
 static HARD_CODED_PATH_PATTERN: OnceLock<Regex> = OnceLock::new();
 static MARKDOWN_HEADER_PATTERN: OnceLock<Regex> = OnceLock::new();
 static CLAUDE_SECTION_GUARD_PATTERN: OnceLock<Regex> = OnceLock::new();
@@ -68,6 +69,14 @@ fn agent_field_pattern() -> &'static Regex {
         // Match any agent: field in YAML frontmatter (Claude Code specific)
         // The agent: field is used to spawn subagents, which is Claude Code exclusive
         Regex::new(r"(?im)^\s*agent:\s*\S+").unwrap()
+    })
+}
+
+fn at_import_pattern() -> &'static Regex {
+    AT_IMPORT_PATTERN.get_or_init(|| {
+        // Match Claude Code @file import syntax (e.g., @path/to/file.md, @.config/rules/*.md)
+        // Must be at the start of a word boundary, followed by a path-like string
+        Regex::new(r"(?m)(?:^|\s)@[\w./-]+\.\w+").unwrap()
     })
 }
 
@@ -187,6 +196,21 @@ pub fn find_claude_specific_features(content: &str) -> Vec<ClaudeSpecificFeature
                 description: "Tool restrictions are Claude Code specific".to_string(),
             });
         }
+
+        // Check for @file import syntax (Claude Code specific)
+        if let Some(mat) = at_import_pattern().find(line) {
+            // Avoid matching email addresses (user@domain.com)
+            let matched = mat.as_str().trim_start();
+            if matched.starts_with('@') && !matched.contains('@') || matched.matches('@').count() == 1
+            {
+                results.push(ClaudeSpecificFeature {
+                    line: line_num + 1,
+                    column: mat.start() + 1,
+                    feature: "@import".to_string(),
+                    description: "The @file import syntax is Claude Code specific".to_string(),
+                });
+            }
+        }
     }
 
     results
@@ -275,8 +299,22 @@ pub struct HardCodedPath {
 
 fn hard_coded_path_pattern() -> &'static Regex {
     HARD_CODED_PATH_PATTERN.get_or_init(|| {
-        // Match common platform-specific config directories
-        Regex::new(r"(?i)(?:\.claude/|\.opencode/|\.cursor/|\.cline/|\.github/copilot/)").unwrap()
+        // Match common platform-specific config directories and OS-specific paths
+        Regex::new(concat!(
+            r"(?i)(?:",
+            // Tool-specific config directories
+            r"\.claude/|\.opencode/|\.cursor/|\.cline/|\.github/copilot/",
+            // macOS-specific paths
+            r"|~/Library/",
+            // Linux-specific hidden config directories (e.g., ~/.config/, ~/.local/)
+            r"|~/\.[a-z][\w-]*/",
+            // Absolute user paths (macOS/Linux)
+            r"|/Users/[a-zA-Z][\w.-]*/",
+            r"|/home/[a-zA-Z][\w.-]*/",
+            // Windows absolute user paths
+            r"|[A-Z]:\\Users\\[a-zA-Z][\w.-]*\\",
+            r")"
+        )).unwrap()
     })
 }
 
@@ -310,8 +348,16 @@ pub fn find_hard_coded_paths(content: &str) -> Vec<HardCodedPath> {
                 "Cline"
             } else if path.contains(".github/copilot") {
                 "GitHub Copilot"
+            } else if path.contains("/library/") || path.starts_with("~/library/") {
+                "macOS"
+            } else if path.starts_with("/users/") || path.starts_with("/home/") {
+                "OS-specific absolute path"
+            } else if path.contains(":\\users\\") {
+                "Windows absolute path"
+            } else if path.starts_with("~/.") {
+                "User-specific hidden directory"
             } else {
-                "Unknown"
+                "OS-specific"
             };
 
             results.push(HardCodedPath {
