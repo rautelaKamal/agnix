@@ -409,9 +409,9 @@ Use environment variables for all platform-specific settings.
         let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
         assert_eq!(xp_003.len(), 1, "XP-003 should fire for CLAUDE.md too");
 
-        // Test generic markdown
+        // Test generic markdown (non-excluded file)
         let diagnostics =
-            validator.validate(Path::new("README.md"), content, &LintConfig::default());
+            validator.validate(Path::new("notes/setup.md"), content, &LintConfig::default());
         let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
         assert_eq!(xp_003.len(), 1, "XP-003 should fire for generic markdown");
     }
@@ -679,6 +679,66 @@ Description here.
 
         let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
         assert!(xp_003.is_empty(), "Relative paths should be OK");
+    }
+
+    #[test]
+    fn test_xp_003_absolute_user_paths() {
+        let content = "# Project\n\n- Path: /Users/lunelson/Code/project/src\n- Linux: /home/user/.config/app";
+        let validator = CrossPlatformValidator;
+        let diagnostics =
+            validator.validate(Path::new("AGENTS.md"), content, &LintConfig::default());
+
+        let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
+        assert_eq!(
+            xp_003.len(),
+            2,
+            "Should detect /Users/ and /home/ absolute paths"
+        );
+    }
+
+    #[test]
+    fn test_xp_003_macos_library_path() {
+        let content = "# Config\n\nChrome profile: ~/Library/Application Support/Google/Chrome";
+        let validator = CrossPlatformValidator;
+        let diagnostics =
+            validator.validate(Path::new("AGENTS.md"), content, &LintConfig::default());
+
+        let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
+        assert_eq!(
+            xp_003.len(),
+            1,
+            "Should detect ~/Library/ as macOS-specific"
+        );
+    }
+
+    #[test]
+    fn test_xp_003_tilde_hidden_dir() {
+        let content = "# Config\n\nSee ~/.config/my-tool/config.yaml for settings";
+        let validator = CrossPlatformValidator;
+        let diagnostics =
+            validator.validate(Path::new("AGENTS.md"), content, &LintConfig::default());
+
+        let xp_003: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-003").collect();
+        assert_eq!(
+            xp_003.len(),
+            1,
+            "Should detect ~/.config/ as user-specific path"
+        );
+    }
+
+    #[test]
+    fn test_xp_001_at_import_in_agents_md() {
+        let content = "# Project\n\nSee @.config/agents/rules/coding.md for coding guidelines";
+        let validator = CrossPlatformValidator;
+        let diagnostics =
+            validator.validate(Path::new("AGENTS.md"), content, &LintConfig::default());
+
+        let xp_001: Vec<_> = diagnostics.iter().filter(|d| d.rule == "XP-001").collect();
+        assert!(
+            xp_001.iter().any(|d| d.message.contains("@import")),
+            "Should detect @file import as Claude-specific. Got: {:?}",
+            xp_001.iter().map(|d| &d.message).collect::<Vec<_>>()
+        );
     }
 
     #[test]

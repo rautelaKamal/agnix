@@ -22,11 +22,11 @@ static_regex!(fn claude_hooks_pattern, r"(?im)^\s*-?\s*(?:type|event):\s*(?:PreT
 static_regex!(fn context_fork_pattern, r"(?im)^\s*context:\s*fork\b");
 static_regex!(fn agent_field_pattern, r"(?im)^\s*agent:\s*\S+");
 static_regex!(fn allowed_tools_pattern, r"(?im)^\s*allowed-tools:\s*.+");
+static_regex!(fn at_import_pattern, r"(?m)(?:^|\s)@[\w./*-]+\.\w+");
 static_regex!(fn claude_section_guard_pattern, r"(?im)^(?:#+\s*|<!--\s*)claude(?:\s+code)?(?:\s+specific|\s+only)?(?:\s*-->)?");
 
 // XP-002/003: Markdown structure and path patterns
 static_regex!(fn markdown_header_pattern, r"^#+\s+.+");
-static_regex!(fn hard_coded_path_pattern, r"(?i)(?:\.claude/|\.opencode/|\.cursor/|\.cline/|\.github/copilot/)");
 
 // XP-004: Build command patterns
 static_regex!(fn build_command_pattern, r"(?m)(?:^|\s|`)((?:npm|pnpm|yarn|bun)\s+(?:install|i|add|build|test|run|exec|ci)\b[^\n`]*)");
@@ -153,6 +153,20 @@ pub fn find_claude_specific_features(content: &str) -> Vec<ClaudeSpecificFeature
                 description: "Tool restrictions are Claude Code specific".to_string(),
             });
         }
+
+        // Check for @file import syntax (Claude Code specific)
+        if let Some(mat) = at_import_pattern().find(line) {
+            // Avoid matching email addresses (user@domain.com)
+            let matched = mat.as_str().trim_start();
+            if matched.starts_with('@') && matched.matches('@').count() == 1 {
+                results.push(ClaudeSpecificFeature {
+                    line: line_num + 1,
+                    column: mat.start() + 1,
+                    feature: "@import".to_string(),
+                    description: "The @file import syntax is Claude Code specific".to_string(),
+                });
+            }
+        }
     }
 
     results
@@ -235,6 +249,8 @@ pub struct HardCodedPath {
     pub platform: String,
 }
 
+// Expanded XP-003 pattern: tool-specific dirs + OS-specific absolute paths
+static_regex!(fn hard_coded_path_pattern, r"(?i)(?:\.claude/|\.opencode/|\.cursor/|\.cline/|\.github/copilot/|~/Library/|~/\.[a-z][\w-]*/|/Users/[a-zA-Z][\w.-]*/|/home/[a-zA-Z][\w.-]*/|[A-Z]:\\Users\\[a-zA-Z][\w.-]*\\)");
 /// Find hard-coded platform-specific paths (for XP-003)
 ///
 /// Detects paths like `.claude/`, `.opencode/`, `.cursor/` that may cause
@@ -265,8 +281,16 @@ pub fn find_hard_coded_paths(content: &str) -> Vec<HardCodedPath> {
                 "Cline"
             } else if path.contains(".github/copilot") {
                 "GitHub Copilot"
+            } else if path.contains("/library/") || path.starts_with("~/library/") {
+                "macOS"
+            } else if path.starts_with("/users/") || path.starts_with("/home/") {
+                "OS-specific absolute path"
+            } else if path.contains(":\\users\\") {
+                "Windows absolute path"
+            } else if path.starts_with("~/.") {
+                "User-specific hidden directory"
             } else {
-                "Unknown"
+                "OS-specific"
             };
 
             results.push(HardCodedPath {
@@ -982,6 +1006,46 @@ allowed-tools: Read Write Bash
 Body"#;
         let results = find_claude_specific_features(content);
         assert!(results.iter().any(|r| r.feature == "allowed-tools"));
+    }
+
+    #[test]
+    fn test_detect_at_import_syntax() {
+        let content = "Include rules from @path/to/rules.md in your config.";
+        let results = find_claude_specific_features(content);
+        assert!(
+            results.iter().any(|r| r.feature == "@import"),
+            "Should detect @path/to/rules.md as @import syntax"
+        );
+    }
+
+    #[test]
+    fn test_detect_at_import_with_wildcard() {
+        let content = "Load all rules with @.config/rules/*.md";
+        let results = find_claude_specific_features(content);
+        assert!(
+            results.iter().any(|r| r.feature == "@import"),
+            "Should detect @.config/rules/*.md (wildcard @import)"
+        );
+    }
+
+    #[test]
+    fn test_no_false_positive_email_in_at_import() {
+        let content = "Contact user@example.com for questions.";
+        let results = find_claude_specific_features(content);
+        assert!(
+            !results.iter().any(|r| r.feature == "@import"),
+            "Email addresses should not be flagged as @imports"
+        );
+    }
+
+    #[test]
+    fn test_no_false_positive_email_standalone() {
+        let content = "Email admin@domain.org for access.";
+        let results = find_claude_specific_features(content);
+        assert!(
+            !results.iter().any(|r| r.feature == "@import"),
+            "Standalone email should not trigger @import detection"
+        );
     }
 
     #[test]

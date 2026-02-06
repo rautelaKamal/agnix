@@ -1,0 +1,383 @@
+schema_version: 1
+
+# Curated list of real-world repos for agnix validation testing.
+# Repos are organized by primary category of agent config files they contain.
+# Status: pending | done | skipped | failed
+
+repos:
+  # ===== Claude Code (CLAUDE.md) =====
+  - url: https://github.com/daytimedrinkingclub/shipstation
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/fblgit/agentool
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/reinhardhq/claude-multi-agent-system
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/imdirtydan23/claude-code-agents
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/p-wegner/coding-aider
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/tekihei2317/with-claude
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/sammcj/agentic_cost_calc
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/hmesfin/gojjo-mcp
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/pnocera/tailscale-mcp
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/LaserFocused-ee/ai-docs-mcp
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/jparkerweb/pixel-banner
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/grabcocque/qarenlm
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/Callumk7/game_master_core
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/oneryalcin/vllm-reranker
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/epieczko/claude-code-riskexec
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/pcharbon70/rubber-duck
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/alicoding/semantic-search-service
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/angelxmoreno/drizzle-repositories
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/artemave/mini-meet
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/syou6162/git-sequential-stage
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/sastraxi/stemset
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/the-dusky/ursa
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/MitchCodes/Typescript-DataUtils
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/keaglin/rwsdk-drizzle-do
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/celeste-kai/celeste-api
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/ianwood103/noted
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/marcosCapistrano/powerhive
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/borgel/periodic-prompter
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/GuyNachshon/zorro
+    categories: [claude-code]
+    status: pending
+  - url: https://github.com/no-yan/wt
+    categories: [claude-code]
+    status: pending
+
+  # ===== Agent Config (AGENTS.md) =====
+  - url: https://github.com/agent-era/devteam
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/dave1010/tools
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/jellydn/hurl.nvim
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/kairin/001-agents-manager
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/dustinboston/ensemble
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/chainstacklabs/web3-ai-trading-agent
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/mikekelly/Policy-Dojo
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/BlindVibeDev/play-buni-platform
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/Genyus/swarm
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/recalibr-ai/evals-workshop
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/nickbaxter18/CodexHUB
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/nulib/design-system
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/foyer-rs/mixtrics
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/Hike-Medical/hike-sdk
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/AlphaGit/worklogger
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/krzyzanowskim/STTextKitPlus
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/dansasser/SIM-ONE
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/RalfBarkow/codex
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/BSteffaniak/planning-poker
+    categories: [agent-config]
+    status: pending
+  - url: https://github.com/thecb4/swift-code-coverage
+    categories: [agent-config]
+    status: pending
+
+  # ===== Cursor (.cursorrules / .mdc) =====
+  - url: https://github.com/alpgul/Cursorrules-Database
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/flashclub/thinking-cursor-rules
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/sreenivasanac/cursor-prompts
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/compass-ai-chat/compass
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/RobPruzan/zenbu
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/knowii-oss/knowii
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/hackclub/sailors-log
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/haqq-network/frontend
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/jacob-ebey/react-router-dashboard-saas-template
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/ilyaizen/streak-calendar
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/penxle/readable
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/Kava-Labs/oros
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/Schroedinger-Hat/osday
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/filearchitect/filearchitect
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/settlemint/settlemint-action
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/baku89/tweeq
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/GorvGoyl/Personal-Site-Gourav.io
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/elixir-dx/dx
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/chrisvogt/gatsby-theme-chronogrove
+    categories: [cursor]
+    status: pending
+  - url: https://github.com/yansircc/payload-builder
+    categories: [cursor]
+    status: pending
+
+  # ===== GitHub Copilot (copilot-instructions.md) =====
+  - url: https://github.com/nkdAgility/azure-devops-migration-tools
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/oxsecurity/megalinter
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/Vishavjeet6/awesome-copilot-instructions
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/rocket-science-for-everyone/github-copilot-custom-instructions
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/microsoft/codespace-features
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/wiz-sec-public/secure-rules-files
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/nickytonline/dev-to-mcp
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/rune/rune
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/mastoj/monostore
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/dianlight/hassio-addons-beta
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/bcgov/renovate-config
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/dminkovski/tcfy25-copilot-extension-demo
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/marcopeg/42go-react
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/tylerbrownhenry/coRules
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/geraldcsoftware/workspace-configs
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/jbaruch/robocoders-devoxx-be-vscode-copilot
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/dylanyoung-dev/nextjs-shadcn-starter
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/jimthompson5802/hello_spec_kit
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/dokun1/confidence-picks
+    categories: [github-copilot]
+    status: pending
+  - url: https://github.com/PaulFWatts/Learning-SvelteKit
+    categories: [github-copilot]
+    status: pending
+
+  # ===== MCP (mcp.json / *.mcp.json) =====
+  - url: https://github.com/chimporg/mcp-registry
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/AlfrescoLabs/alfresco-mcp-server
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/sargonpiraev/notion-mcp-server
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/cbunting99/mcp-code-analysis-server
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/chainstacklabs/rpc-nodes-mcp
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/vessl-ai/mcpctl
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/reliverse/reliverse
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/Nhahan/mcp-agent
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/r-pedraza/mcp-jira-integration
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/mikekistler/mcp-demo
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/CS-Tao/x-mcp
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/CodeGlide/codeglide-mcpgen
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/ganpare/gpt-sovits-mcp-server
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/KFAaron/mcp-client
+    categories: [mcp]
+    status: pending
+  - url: https://github.com/kieranajp/mcp
+    categories: [mcp]
+    status: pending
+
+  # ===== Claude Code Hooks (.claude/settings.json) =====
+  - url: https://github.com/androidyue/claude_code_plugin_example
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/Krenuds/claude-code-project-template
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/shdennlin/claude-hooks-notifier
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/EvanFabry/claude_agents
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/horatjp/example-claude-code-devcontainer
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/qte77/context-engineering-template
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/toolprint/claude-task
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/forsonny/Claude-Code-Novel-Writer
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/hashintel/hash
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/tonsky/tgadmin
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/S1M0N38/ccusage.nvim
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/vfarcic/idp-full-demo
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/Nextdoor/lumina
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/MetaMask/metamask-design-system
+    categories: [claude-code-hooks]
+    status: pending
+  - url: https://github.com/tphakala/birdnet-pi2go
+    categories: [claude-code-hooks]
+    status: pending
+
+  # ===== Self-test (agnix itself) =====
+  - url: https://github.com/avifenesh/agnix
+    categories: [claude-code, claude-code-hooks, self-test]
+    status: pending

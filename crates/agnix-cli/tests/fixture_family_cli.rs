@@ -70,11 +70,23 @@ make_cli_test!(
     "xml",
     ["XML-001", "XML-002", "XML-003"]
 );
-make_cli_test!(
-    test_cli_reports_ref_fixtures,
-    "refs",
-    ["REF-001", "REF-002"]
-);
+// REF-001 still fires on generic markdown (tests @import syntax)
+make_cli_test!(test_cli_reports_ref_001_fixtures, "refs", ["REF-001"]);
+
+// REF-002 only fires on agent config files, so we need a CLAUDE.md with broken links
+#[test]
+fn test_cli_reports_ref_002_fixtures() {
+    let temp = tempfile::TempDir::new().unwrap();
+    let claude_path = temp.path().join("CLAUDE.md");
+    std::fs::write(
+        &claude_path,
+        "# Project\n\nSee [guide](missing-guide.md) for more details.\n",
+    )
+    .unwrap();
+
+    let json = run_json(temp.path());
+    assert_has_rule(&json, "REF-002");
+}
 make_cli_test!(test_cli_reports_mcp_fixtures, "mcp", ["MCP-001", "MCP-006"]);
 make_cli_test!(
     test_cli_reports_agm_fixtures,

@@ -171,10 +171,25 @@ cases:
     expected: [REF-001]
     description: "Missing import file triggers REF-001"
 
-  - file: fixtures/refs/broken-link.md
+  - file: fixtures/refs/broken-link/CLAUDE.md
     expected: [REF-002]
     description: "Broken relative link triggers REF-002"
 
   - file: fixtures/refs/valid-links.md
     expected: []
     description: "Valid references should have no errors"
+
+  # ===== Real-World Regression Tests =====
+  # Derived from real-world validation against 121 repos
+
+  - file: fixtures/real-world/html5-void-elements/CLAUDE.md
+    expected: []
+    description: "HTML5 void elements (br, img, hr, input, source) should not trigger XML-001"
+
+  - file: fixtures/real-world/type-parameters/CLAUDE.md
+    expected: []
+    description: "Type parameters (T, Option, Key, Value, TableName) should not trigger XML-001"
+
+  - file: fixtures/real-world/absolute-paths/AGENTS.md
+    expected: [XP-003]
+    description: "Absolute OS paths (/Users/, /home/, ~/Library/) should trigger XP-003"

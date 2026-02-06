@@ -389,6 +389,63 @@ fn scan_imports_in_text(
     }
 }
 
+/// Returns true if the tag name is an HTML5 void element.
+/// Void elements are elements that cannot have child nodes and never
+/// need closing tags (e.g., `<br>`, `<img>`, `<hr>`).
+/// See: https://html.spec.whatwg.org/multipage/syntax.html#void-elements
+fn is_html5_void_element(name: &str) -> bool {
+    matches!(
+        name.to_lowercase().as_str(),
+        "area"
+            | "base"
+            | "br"
+            | "col"
+            | "embed"
+            | "hr"
+            | "img"
+            | "input"
+            | "link"
+            | "meta"
+            | "param"
+            | "source"
+            | "track"
+            | "wbr"
+    )
+}
+
+/// Returns true if the tag name looks like a programming language type parameter
+/// rather than an XML/HTML tag. Common in TypeScript, Rust, Java, C# code examples.
+fn is_likely_type_parameter(name: &str) -> bool {
+    // Single uppercase letter: <T>, <K>, <V>, <E>, <R>
+    if name.len() == 1 && name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        return true;
+    }
+    // Common generic type parameter names (PascalCase, all start with uppercase)
+    matches!(
+        name,
+        "Key"
+            | "Value"
+            | "Item"
+            | "Element"
+            | "Result"
+            | "Error"
+            | "Input"
+            | "Output"
+            | "State"
+            | "Props"
+            | "Args"
+            | "Return"
+            | "Option"
+            | "Type"
+            | "Param"
+            | "Config"
+            | "Context"
+            | "TableName"
+            | "DeviceID"
+            | "FieldName"
+    )
+}
+
 fn scan_xml_tags_in_text(
     text: &str,
     range: Range<usize>,
@@ -414,6 +471,22 @@ fn scan_xml_tags_in_text(
 
         if let Some(name_match) = cap.get(2) {
             let name = name_match.as_str().to_string();
+
+            // Skip HTML5 void elements - they never need closing tags.
+            // In markdown, these are commonly written without self-closing syntax
+            // (e.g., <br> instead of <br/>, <img src="..."> instead of <img ... />)
+            if is_html5_void_element(&name) && !is_closing {
+                continue;
+            }
+
+            // Skip likely type parameters from programming languages.
+            // Single uppercase letters (T, K, V) and PascalCase names ending
+            // in common generic suffixes are almost always type parameters,
+            // not XML tags. These appear frequently in API docs and code examples
+            // within agent instructions.
+            if !is_closing && is_likely_type_parameter(&name) {
+                continue;
+            }
             let start = cap.get(0).unwrap().start();
             let end = cap.get(0).unwrap().end();
             let start_byte = range.start + start;
