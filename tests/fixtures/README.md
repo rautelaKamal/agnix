@@ -23,9 +23,12 @@ Keep fixtures minimal, deterministic, and focused on one rule family when possib
 | XP | `cross_platform/` | `cross_platform/valid/AGENTS.md` | `cross_platform/hard-coded/AGENTS.md` |
 | MCP | `mcp/` | `mcp/valid-tool.mcp.json` | `mcp/invalid-jsonrpc-version.mcp.json` |
 | PE | `prompt/` | `prompt/pe-001-valid.md` | `prompt/pe-001-critical-in-middle.md` |
-| REF | `refs/` | `refs/valid-links.md` | `refs/broken-link.md`, `refs/missing-import.md` |
+| REF | `refs/` | `refs/valid-links.md` | `refs/broken-link/CLAUDE.md`, `refs/missing-import.md` |
 | XML | `xml/` | `xml/xml-valid.md` | `xml/xml-001-unclosed.md` |
+| Real-world | `real-world/` | `real-world/html5-void-elements/CLAUDE.md` | `real-world/absolute-paths/AGENTS.md` |
 
 ## Notes
 - AGENTS.md and cross-platform fixtures intentionally overlap; they are validated by different rule families.
+- `real-world/` fixtures are regression tests derived from testing against 121 real-world repositories.
+- REF-002 only fires on agent config files (CLAUDE.md, AGENTS.md, SKILL.md), so broken-link fixture uses CLAUDE.md.
 - Keep fixture paths stable, as tests assert on filenames.
