@@ -787,12 +787,16 @@ mod tests {
         let diagnostics = validator.validate(&skill_md, "See @CLAUDE.md", &LintConfig::default());
 
         // CLAUDE.md's missing import should emit CC-MEM-001, not REF-001
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.rule == "CC-MEM-001" && d.file.ends_with("CLAUDE.md")));
-        assert!(!diagnostics
-            .iter()
-            .any(|d| d.rule == "REF-001" && d.file.ends_with("CLAUDE.md")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.rule == "CC-MEM-001" && d.file.ends_with("CLAUDE.md"))
+        );
+        assert!(
+            !diagnostics
+                .iter()
+                .any(|d| d.rule == "REF-001" && d.file.ends_with("CLAUDE.md"))
+        );
     }
 
     #[test]
@@ -806,9 +810,11 @@ mod tests {
             validator.validate(&file_path, "See @/etc/passwd", &LintConfig::default());
 
         // Absolute paths should be rejected
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.message.contains("Absolute import paths not allowed")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("Absolute import paths not allowed"))
+        );
     }
 
     #[test]
@@ -828,9 +834,11 @@ mod tests {
         let validator = ImportsValidator;
         let diagnostics = validator.validate(&file_path, "See @../../outside.md", &config);
 
-        assert!(diagnostics
-            .iter()
-            .any(|d| { d.rule == "CC-MEM-001" && d.message.contains("escapes project root") }));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| { d.rule == "CC-MEM-001" && d.message.contains("escapes project root") })
+        );
     }
 
     #[cfg(unix)]
@@ -859,9 +867,11 @@ mod tests {
         let validator = ImportsValidator;
         let diagnostics = validator.validate(&file_path, "See @../link/secret.md", &config);
 
-        assert!(diagnostics
-            .iter()
-            .any(|d| { d.rule == "CC-MEM-001" && d.message.contains("escapes project root") }));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| { d.rule == "CC-MEM-001" && d.message.contains("escapes project root") })
+        );
     }
 
     // ===== Helper Function Tests =====

@@ -153,9 +153,9 @@ Body"#;
 fn test_as_011_compatibility_too_long() {
     let long_compat = "b".repeat(501);
     let content = format!(
-            "---\nname: test-skill\ndescription: Use when validating compatibility\ncompatibility: {}\n---\nBody",
-            long_compat
-        );
+        "---\nname: test-skill\ndescription: Use when validating compatibility\ncompatibility: {}\n---\nBody",
+        long_compat
+    );
 
     let validator = SkillValidator;
     let diagnostics = validator.validate(Path::new("test.md"), &content, &LintConfig::default());

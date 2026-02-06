@@ -3,7 +3,7 @@
 use crate::{
     config::LintConfig,
     diagnostics::{Diagnostic, Fix},
-    parsers::frontmatter::{split_frontmatter, FrontmatterParts},
+    parsers::frontmatter::{FrontmatterParts, split_frontmatter},
     regex_util::static_regex,
     rules::Validator,
     schemas::skill::SkillSchema,

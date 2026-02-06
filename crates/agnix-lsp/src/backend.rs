@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 use std::future::Future;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::sync::RwLock;
 use tower_lsp::jsonrpc::Result;

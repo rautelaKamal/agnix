@@ -7,11 +7,11 @@
 //! - COP-004: Unknown frontmatter keys (MEDIUM) - warn about unrecognized keys
 
 use crate::{
+    FileType,
     config::LintConfig,
     diagnostics::Diagnostic,
     rules::Validator,
     schemas::copilot::{is_body_empty, is_content_empty, parse_frontmatter, validate_glob_pattern},
-    FileType,
 };
 use rust_i18n::t;
 use std::path::Path;

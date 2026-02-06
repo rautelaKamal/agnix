@@ -9,13 +9,13 @@
 //! - CUR-006: Legacy .cursorrules detected (MEDIUM) - migration warning
 
 use crate::{
+    FileType,
     config::LintConfig,
     diagnostics::Diagnostic,
     rules::Validator,
     schemas::cursor::{
         is_body_empty, is_content_empty, parse_mdc_frontmatter, validate_glob_pattern,
     },
-    FileType,
 };
 use rust_i18n::t;
 use std::path::Path;
@@ -286,9 +286,11 @@ description: Unclosed frontmatter
         let cur_002: Vec<_> = diagnostics.iter().filter(|d| d.rule == "CUR-002").collect();
         assert_eq!(cur_002.len(), 1);
         assert_eq!(cur_002[0].level, DiagnosticLevel::Warning);
-        assert!(cur_002[0]
-            .message
-            .contains("missing recommended frontmatter"));
+        assert!(
+            cur_002[0]
+                .message
+                .contains("missing recommended frontmatter")
+        );
     }
 
     #[test]

@@ -30,9 +30,11 @@ fn test_cc_hk_006_command_hook_missing_command() {
 
     assert_eq!(cc_hk_006.len(), 1);
     assert_eq!(cc_hk_006[0].level, DiagnosticLevel::Error);
-    assert!(cc_hk_006[0]
-        .message
-        .contains("missing required 'command' field"));
+    assert!(
+        cc_hk_006[0]
+            .message
+            .contains("missing required 'command' field")
+    );
 }
 
 #[test]
@@ -107,9 +109,11 @@ fn test_cc_hk_007_prompt_hook_missing_prompt() {
 
     assert_eq!(cc_hk_007.len(), 1);
     assert_eq!(cc_hk_007[0].level, DiagnosticLevel::Error);
-    assert!(cc_hk_007[0]
-        .message
-        .contains("missing required 'prompt' field"));
+    assert!(
+        cc_hk_007[0]
+            .message
+            .contains("missing required 'prompt' field")
+    );
 }
 
 #[test]
@@ -593,12 +597,16 @@ fn test_dangerous_pattern_case_insensitive() {
     let validator = HooksValidator;
 
     assert!(validator.check_dangerous_patterns("RM -RF /").is_some());
-    assert!(validator
-        .check_dangerous_patterns("Git Reset --Hard")
-        .is_some());
-    assert!(validator
-        .check_dangerous_patterns("DROP DATABASE test")
-        .is_some());
+    assert!(
+        validator
+            .check_dangerous_patterns("Git Reset --Hard")
+            .is_some()
+    );
+    assert!(
+        validator
+            .check_dangerous_patterns("DROP DATABASE test")
+            .is_some()
+    );
 }
 
 #[test]
@@ -702,16 +710,20 @@ fn test_cc_hk_001_wrong_case_event_name() {
 
     assert_eq!(cc_hk_001.len(), 1);
     // Should suggest the correct case
-    assert!(cc_hk_001[0]
-        .suggestion
-        .as_ref()
-        .unwrap()
-        .contains("PreToolUse"));
-    assert!(cc_hk_001[0]
-        .suggestion
-        .as_ref()
-        .unwrap()
-        .contains("case-sensitive"));
+    assert!(
+        cc_hk_001[0]
+            .suggestion
+            .as_ref()
+            .unwrap()
+            .contains("PreToolUse")
+    );
+    assert!(
+        cc_hk_001[0]
+            .suggestion
+            .as_ref()
+            .unwrap()
+            .contains("case-sensitive")
+    );
 }
 
 #[test]
@@ -806,9 +818,11 @@ fn test_cc_hk_002_prompt_on_pretooluse() {
 
     assert_eq!(cc_hk_002.len(), 1);
     assert_eq!(cc_hk_002[0].level, DiagnosticLevel::Error);
-    assert!(cc_hk_002[0]
-        .message
-        .contains("only allowed for Stop and SubagentStop"));
+    assert!(
+        cc_hk_002[0]
+            .message
+            .contains("only allowed for Stop and SubagentStop")
+    );
 }
 
 #[test]
@@ -1117,9 +1131,11 @@ fn test_cc_hk_005_missing_type_field() {
 
     assert_eq!(cc_hk_005.len(), 1);
     assert_eq!(cc_hk_005[0].level, DiagnosticLevel::Error);
-    assert!(cc_hk_005[0]
-        .message
-        .contains("missing required 'type' field"));
+    assert!(
+        cc_hk_005[0]
+            .message
+            .contains("missing required 'type' field")
+    );
 }
 
 #[test]

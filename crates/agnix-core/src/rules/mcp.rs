@@ -5,8 +5,9 @@ use crate::{
     diagnostics::Diagnostic,
     rules::Validator,
     schemas::mcp::{
-        extract_request_protocol_version, extract_response_protocol_version, is_initialize_message,
-        is_initialize_response, validate_json_schema_structure, McpConfigSchema, McpToolSchema,
+        McpConfigSchema, McpToolSchema, extract_request_protocol_version,
+        extract_response_protocol_version, is_initialize_message, is_initialize_response,
+        validate_json_schema_structure,
     },
 };
 use rust_i18n::t;
@@ -629,9 +630,11 @@ mod tests {
         }"#;
         let diagnostics = validate(content);
         assert!(diagnostics.iter().any(|d| d.rule == "MCP-003"));
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.message.contains("Invalid JSON Schema type")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("Invalid JSON Schema type"))
+        );
     }
 
     #[test]
@@ -643,9 +646,11 @@ mod tests {
         }"#;
         let diagnostics = validate(content);
         assert!(diagnostics.iter().any(|d| d.rule == "MCP-003"));
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.message.contains("must be an object")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("must be an object"))
+        );
     }
 
     #[test]
@@ -741,9 +746,11 @@ mod tests {
         }"#;
         let diagnostics = validate(content);
         assert!(diagnostics.iter().any(|d| d.rule == "MCP-005"));
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.message.contains("consent mechanism")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("consent mechanism"))
+        );
     }
 
     #[test]
@@ -794,9 +801,11 @@ mod tests {
         }"#;
         let diagnostics = validate(content);
         assert!(diagnostics.iter().any(|d| d.rule == "MCP-006"));
-        assert!(diagnostics
-            .iter()
-            .any(|d| d.message.contains("annotations")));
+        assert!(
+            diagnostics
+                .iter()
+                .any(|d| d.message.contains("annotations"))
+        );
     }
 
     #[test]

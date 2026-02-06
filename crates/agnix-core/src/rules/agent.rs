@@ -368,9 +368,11 @@ Agent instructions"#;
 
         assert_eq!(cc_ag_002.len(), 1);
         assert_eq!(cc_ag_002[0].level, DiagnosticLevel::Error);
-        assert!(cc_ag_002[0]
-            .message
-            .contains("missing required 'description'"));
+        assert!(
+            cc_ag_002[0]
+                .message
+                .contains("missing required 'description'")
+        );
     }
 
     #[test]
@@ -889,9 +891,11 @@ Agent instructions"#;
             .collect();
 
         assert_eq!(parse_errors.len(), 1);
-        assert!(parse_errors[0]
-            .message
-            .contains("must have YAML frontmatter"));
+        assert!(
+            parse_errors[0]
+                .message
+                .contains("must have YAML frontmatter")
+        );
     }
 
     #[test]

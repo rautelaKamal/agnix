@@ -3,7 +3,7 @@
 use crate::{
     config::LintConfig,
     diagnostics::{Diagnostic, Fix},
-    parsers::markdown::{check_xml_balance_with_content_end, extract_xml_tags, XmlBalanceError},
+    parsers::markdown::{XmlBalanceError, check_xml_balance_with_content_end, extract_xml_tags},
     rules::Validator,
 };
 use rust_i18n::t;
@@ -170,10 +170,12 @@ mod tests {
         // Find the XML-002 diagnostic
         let xml_002 = diagnostics.iter().find(|d| d.rule == "XML-002");
         assert!(xml_002.is_some(), "Expected XML-002 diagnostic");
-        assert!(xml_002
-            .unwrap()
-            .message
-            .contains("Expected '</inner>' but found '</outer>'"));
+        assert!(
+            xml_002
+                .unwrap()
+                .message
+                .contains("Expected '</inner>' but found '</outer>'")
+        );
     }
 
     // XML-003: Unmatched closing tag produces XML-003 rule ID
