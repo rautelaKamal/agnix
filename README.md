@@ -137,7 +137,7 @@ Real-time diagnostics as you type, quick-fix code actions, hover documentation.
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/avifenesh/agnix
-    rev: v0.7.2
+    rev: v0.8.0
     hooks:
       - id: agnix
 ```

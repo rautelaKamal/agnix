@@ -904,6 +904,9 @@ mod proptests {
             tag in "[a-z]+",
             content in "[a-zA-Z0-9 ]{0,100}"
         ) {
+            // Skip HTML5 void elements - they are intentionally excluded from balance checking
+            prop_assume!(!is_html5_void_element(&tag));
+            prop_assume!(!is_likely_type_parameter(&tag));
             let input = format!("<{}>{}</{}>", tag, content, tag);
             let tags = extract_xml_tags(&input);
             let errors = check_xml_balance(&tags);
@@ -918,6 +921,9 @@ mod proptests {
 
         #[test]
         fn xml_unclosed_detected(tag in "[a-z]+") {
+            // Skip HTML5 void elements and type parameters - they are intentionally excluded
+            prop_assume!(!is_html5_void_element(&tag));
+            prop_assume!(!is_likely_type_parameter(&tag));
             let input = format!("<{}>content", tag);
             let tags = extract_xml_tags(&input);
             let errors = check_xml_balance(&tags);
