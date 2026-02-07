@@ -1,6 +1,6 @@
 # agnix Technical Reference
 
-> Linter for agent configs. 124 rules across 15 categories.
+> Linter for agent configs. 128 rules across 15 categories.
 
 ## What agnix Validates
 
@@ -11,7 +11,7 @@
 | Memory (Claude Code) | CLAUDE.md, CLAUDE.local.md | 10 |
 | Instructions (Cross-Tool) | AGENTS.md, AGENTS.local.md, AGENTS.override.md | 6 |
 | Agents | agents/*.md | 13 |
-| Plugins | plugin.json | 6 |
+| Plugins | plugin.json | 10 |
 | Prompt Engineering | CLAUDE.md, AGENTS.md | 4 |
 | Cross-Platform | AGENTS.md | 6 |
 | MCP | tool definitions | 12 |
@@ -35,7 +35,7 @@ agnix/
 │   ├── agnix-lsp/      # LSP server
 │   └── agnix-mcp/      # MCP server
 ├── editors/            # Neovim, VS Code, JetBrains, Zed integrations
-├── knowledge-base/     # 124 rules documented
+├── knowledge-base/     # 128 rules documented
 ├── scripts/            # Build/dev automation scripts
 ├── website/            # Docusaurus documentation website
 └── tests/fixtures/     # Test cases

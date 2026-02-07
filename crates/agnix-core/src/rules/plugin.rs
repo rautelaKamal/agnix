@@ -305,7 +305,10 @@ fn path_inside_claude_plugin(p: &str) -> bool {
 fn extract_paths(value: &serde_json::Value) -> Vec<String> {
     match value {
         serde_json::Value::String(s) => vec![s.clone()],
-        serde_json::Value::Array(arr) => arr.iter().filter_map(|v| v.as_str().map(String::from)).collect(),
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .filter_map(|v| v.as_str().map(String::from))
+            .collect(),
         _ => vec![],
     }
 }
@@ -916,7 +919,11 @@ mod tests {
             .iter()
             .filter(|d| d.rule == "CC-PL-007")
             .collect();
-        assert_eq!(pl_007.len(), 1, "Only the invalid path should trigger CC-PL-007");
+        assert_eq!(
+            pl_007.len(),
+            1,
+            "Only the invalid path should trigger CC-PL-007"
+        );
     }
 
     #[test]

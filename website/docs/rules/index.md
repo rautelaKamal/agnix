@@ -1,7 +1,7 @@
 # Rules Reference
 
-This section contains all `124` validation rules generated from `knowledge-base/rules.json`.
-`28` rules have automatic fixes.
+This section contains all `128` validation rules generated from `knowledge-base/rules.json`.
+`29` rules have automatic fixes.
 
 | Rule | Name | Severity | Category | Auto-Fix |
 |------|------|----------|----------|----------|
