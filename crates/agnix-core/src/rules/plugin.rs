@@ -188,16 +188,14 @@ impl Validator for PluginValidator {
                     }
                     None => {
                         // homepage is present but not a string (e.g., number, object)
+                        let val_str = homepage_val.to_string();
                         diagnostics.push(
                             Diagnostic::warning(
                                 path.to_path_buf(),
                                 1,
                                 0,
                                 "CC-PL-010",
-                                t!(
-                                    "rules.cc_pl_010.message",
-                                    url = homepage_val.to_string().as_str()
-                                ),
+                                t!("rules.cc_pl_010.message", url = val_str.as_str()),
                             )
                             .with_suggestion(t!("rules.cc_pl_010.suggestion")),
                         );
