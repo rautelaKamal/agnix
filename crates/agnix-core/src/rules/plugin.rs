@@ -1,4 +1,6 @@
-//! Plugin manifest validation (CC-PL-001 to CC-PL-010)
+//! Plugin manifest validation (CC-PL-001 to CC-PL-010).
+//!
+//! Validates `.claude-plugin/plugin.json` manifests.
 
 use crate::{
     config::LintConfig,
