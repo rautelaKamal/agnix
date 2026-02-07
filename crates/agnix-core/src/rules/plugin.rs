@@ -344,7 +344,7 @@ fn check_component_paths(
                             start,
                             end,
                             &fixed,
-                            &format!("Prepend './' to path: '{}'", p.trim()),
+                            format!("Prepend './' to path: '{}'", p.trim()),
                             true,
                         ));
                     }
