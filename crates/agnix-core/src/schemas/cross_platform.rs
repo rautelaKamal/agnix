@@ -2218,16 +2218,17 @@ Use pnpm install for dependencies.
         );
     }
     #[test]
-    fn test_categorize_gemini_md() {
+    fn test_categorize_gemini_md_variants() {
         use std::path::PathBuf;
-        let layer = categorize_layer(&PathBuf::from("project/GEMINI.md"), "# Project");
-        assert_eq!(layer.layer_type, LayerType::GeminiMd);
-    }
-
-    #[test]
-    fn test_categorize_gemini_local_md() {
-        use std::path::PathBuf;
-        let layer = categorize_layer(&PathBuf::from("project/GEMINI.local.md"), "# Project");
-        assert_eq!(layer.layer_type, LayerType::GeminiMd);
+        let files = ["project/GEMINI.md", "project/GEMINI.local.md"];
+        for file in files {
+            let layer = categorize_layer(&PathBuf::from(file), "# Project");
+            assert_eq!(
+                layer.layer_type,
+                LayerType::GeminiMd,
+                "Failed for file: {}",
+                file
+            );
+        }
     }
 }
