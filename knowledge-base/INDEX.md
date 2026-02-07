@@ -14,6 +14,7 @@
 | **Find patterns** | [PATTERNS-CATALOG.md](./PATTERNS-CATALOG.md) - 70 patterns from awesome-slash |
 | **Get platform context** | [agent-docs/](#agent-docs) - 10 reference docs |
 | **Cross-platform support** | [standards/multi-platform-HARD-RULES.md](./standards/multi-platform-HARD-RULES.md) |
+| **Find rule gaps** | [agent-config-optional-fields.md](./agent-config-optional-fields.md) - Optional field coverage gaps |
 | **Track tools/research** | [RESEARCH-TRACKING.md](./RESEARCH-TRACKING.md) - Tool inventory and monitoring |
 | **Monthly review** | [MONTHLY-REVIEW.md](./MONTHLY-REVIEW.md) - Review checklist and completed reviews |
 
@@ -29,6 +30,7 @@ knowledge-base/
 ├── PATTERNS-CATALOG.md             # 70 production-tested patterns
 ├── RESEARCH-TRACKING.md            # Tool inventory and monitoring process
 ├── MONTHLY-REVIEW.md               # Monthly review checklist and history
+├── agent-config-optional-fields.md # Gap analysis: optional fields across S/A-tier tools
 │
 ├── standards/                      # HARD-RULES and OPINIONS by topic
 │   ├── README.md                   # Standards navigation
